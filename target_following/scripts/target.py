@@ -21,12 +21,18 @@ class Target:
 		
 		self.vel_msg = Twist() # creating inital publish message, which is altered in the main
 
+	# move function that dictates next target velocities and locations
+	def move(self):
+		continue
+
 	def main(self):
 
 		# setup code
 		rate = rospy.Rate(FREQ)
 
 		while not rospy.is_shutdown():
+			self.move() # calling the move function each iteration
+
 			# altering the message to publish the linear and angular velocity decided
 			self.vel_msg.linear.x = self.linxvel
 			self.vel_msg.angular.z = self.angzvel
