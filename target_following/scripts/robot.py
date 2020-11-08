@@ -5,9 +5,9 @@ from geometry_msgs.msg import Twist
 FREQ = 10 # Hz
 SLEEP = 2
 
-class Target:
+class Robot:
 	def __init__(self):
-		rospy.init_node("target") # feel free to rename
+		rospy.init_node("robot") # feel free to rename
 		self.pub = rospy.Publisher("robot_0/cmd_vel", Twist, queue_size=0)
 		rospy.sleep(SLEEP)
 
@@ -22,5 +22,5 @@ class Target:
 
 if __name__ == "__main__":
 	# we'll probably set up target like this from main.py?
-	r = Target()
+	r = Robot()
 	r.main()
