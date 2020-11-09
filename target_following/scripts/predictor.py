@@ -12,10 +12,12 @@ SLEEP = 2
 class Predictor:
 	def __init__(self):
 
-		# target poses and velocities
+		# target poses
 		self.poses = []
-		self.linvel = None
-		self.angvel = None
+
+		# predicted target velocities
+		self.pred_linvel = None
+		self.pred_angvel = None
 
 	# given pose information from Identifier, updating instance variable for Predictors
 	def update_targetpos(self, posx, posy, linvel, angvel):
