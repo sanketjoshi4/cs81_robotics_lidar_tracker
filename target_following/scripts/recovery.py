@@ -1,6 +1,7 @@
 from geometry_msgs.msg import Point
 from cell import Cell
 from world import World
+import heapq as hq
 
 
 LOST_THRESH = 10 # s
@@ -12,8 +13,8 @@ class Recovery:
 		self.start = []
 		self.end = []
 		self.last_known_pos = Point()
-		self.last_known_pos.x = 3
-		self.last_known_pos.y = 3
+		self.last_known_pos.x = 102
+		self.last_known_pos.y = 100
 		self.last_known_vel = None
 		self.robot_pos = None
 		self.elapsed_lost_time = 0
@@ -29,17 +30,18 @@ class Recovery:
 		self.start = [self.robot_pos.x, self.robot_pos.y]
 
 		# convert from map to grid; theta doesn't matter here
-		start_grid_x, start_grid_y, theta = self.map.map_to_grid(self.start[0], self.start[1], 0)
-		end_grid_x, end_grid_y, theta = self.map.map_to_grid(self.end[0], self.end[1], 0)
+		start_grid_x, start_grid_y, theta = self.world.map_to_grid(self.start[0], self.start[1], 0)
+		end_grid_x, end_grid_y, theta = self.world.map_to_grid(self.end[0], self.end[1], 0)
 
 		# convert from grid to cell
-		start_cell_x, start_cell_y = self.map.grid_to_cell(start_grid_x, start_grid_y)
-		end_cell_x, end_cell_y = self.map.grid_to_cell(end_grid_x, end_grid_y)
+		start_cell_x, start_cell_y = self.world.grid_to_cell(start_grid_x, start_grid_y)
+		end_cell_x, end_cell_y = self.world.grid_to_cell(end_grid_x, end_grid_y)
 
 		self.start = [start_cell_x, start_cell_y]
 		self.end = [end_cell_x, end_cell_y]
 
 		path = self.a_star()
+		print(path)
 		return self.get_path_poses(path)
 	
 	def diagonal(self, curr_x, curr_y):
@@ -72,6 +74,7 @@ class Recovery:
 		while len(open_set) > 0:
 			# get next lowest in open set; 1st index is Cell obj because 0th index is diagonal
 			curr = hq.heappop(open_set)[1]
+			print(curr)
 
 			# we've found goal, back trace and return
 			if curr == goal:
@@ -86,10 +89,10 @@ class Recovery:
 			# look at all neighbors in y dir
 			cx = curr.coords[0]
 			cy = curr.coords[1]
-			for ny in range(max(0, cy - 1), min(cy + 2, self.map.height)):
-				for nx in range(max(0, cx - 1), min(cx + 2, self.map.width)):
+			for ny in range(max(0, cy - 1), min(cy + 2, self.world.height)):
+				for nx in range(max(0, cx - 1), min(cx + 2, self.world.width)):
 					# if not current cell and doesn't have obstacle
-					if cy != ny and cx != nx and not self.map.get_cell(cx, ny):
+					if cy != ny and cx != nx and not self.world.get_cell(cx, ny):
 						n = Cell([nx, ny])
 						temp_g = g_vals[curr] + EDGE_WEIGHT
 						# if cost from start to n is lowest so far, or no cost calculated yet
@@ -121,9 +124,9 @@ class Recovery:
 			cy = path[i].coords[1]
 
 			# get x,y in grid
-			grid_x, grid_y = self.map.cell_to_grid(cx, cy)
+			grid_x, grid_y = self.world.cell_to_grid(cx, cy)
 
 			# get x,y in map; yaw doesn't matter
-			map_x, map_y, map_yaw = self.map.grid_to_map(grid_x, grid_y, 0)
+			map_x, map_y, map_yaw = self.world.grid_to_map(grid_x, grid_y, 0)
 			poses.append([map_x, map_y])
 		return poses
