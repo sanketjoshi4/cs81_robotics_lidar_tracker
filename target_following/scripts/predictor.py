@@ -27,8 +27,16 @@ class Predictor:
 		poses.append(target)
 
 	# given poses, return robot intended linear and angular velocity
-	def predict(self):
-		continue
+	def predict(self, list_poses, key): 
+		total_linvel=0
+		total_angvel=0
+		for pose in list_poses:
+			total_linvel += pose.linvel
+			total_angvel += pose.angvel
+		# treating each velocity with an equal probability, so taking average linear and angular velocity
+		self.pred_linvel = total_linvel/(len(list_poses))
+		self.pred_angvel = total_angvel/(len(list_poses))
+
 
 # mini class that has all the current information on target's whereabouts
 class Pose:
