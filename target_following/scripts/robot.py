@@ -42,7 +42,7 @@ class Robot:
         while not rospy.is_shutdown():
             vel_msg.linear.x = 0.1
             self.pub.publish(vel_msg)
-            self.update_pose()
+            # self.update_pose()
             rate.sleep()
 
     def laser_scan_callback(self, laser_scan_msg):
@@ -50,12 +50,12 @@ class Robot:
         if self.time_last_scan is None or (curr_time - self.time_last_scan > 1 / SCAN_FREQ):
             self.time_last_scan = curr_time
 
-            # TODO : calculate the movement_transform matrix, which converts points in current frame to as they would be seen in the last frame when scannr ran
+            # TODO : calculate the movement_transform matrix, which converts points in current frame,
+            # to as they would be seen in the last frame when scanner ran
             movement_transform = None
             self.pose_last_scan = self.pose
-
-            self.id.blobify(laser_scan_msg, movement_transform)
-            self.id.classify(None)
+            self.id.blobify(laser_scan_msg)
+            # self.id.classify(None, movement_transform)
 
     def update_pose(self):
         # TODO : Publish to map frame, change base_link to map
@@ -94,13 +94,13 @@ class Identifier:
     DIST_MAX_OK = 10
     DIST_MAX_FAR = 20
 
-    def __init__(self): # All w.r.t. bot
+    def __init__(self):  # All w.r.t. bot
         self.blobs = {}  # dict of blob_id to Blob item
         self.last_blobs = {}  # blobs during last scan
         self.target = None  # (x, y)
         self.last_target = None  # (x, y)
-        self.obs = None # list of Blob items
-        self.status = None # Amongst
+        self.obs = None  # list of Blob items
+        self.status = None  # Amongst
 
     def blobify(self, laser_scan_msg):
 
@@ -129,6 +129,8 @@ class Identifier:
         for blob_id, blob in self.blobs.items():
             blob.calculate_mean()
 
+        print [b.show() for b in self.blobs.values()]
+
     def classify(self, movement_transform=None):
 
         # TODO : target.pos, [obs] <- blobs
@@ -148,7 +150,6 @@ class Identifier:
 
         self.obs = obs
         self.target = target
-        # print {i: len(v) for i, v in self.blobs.items()}
 
         # TODO : target.lin_vel <- (target.pos, target.last_pos)
         # TODO : return target{pos,vel}
@@ -156,7 +157,7 @@ class Identifier:
     def status(self):
         if self.target is None:
             return Identifier.STATUS_ERR
-        dist = float(np.sqrt(self.target[0]*self.target[0]+self.target[1]*self.target[1]))
+        dist = float(np.sqrt(self.target[0] * self.target[0] + self.target[1] * self.target[1]))
         if dist < Identifier.DIST_MAX_CLOSE:
             return Identifier.STATUS_CLOSE
         if dist < Identifier.DIST_MAX_OK:
@@ -180,10 +181,16 @@ class Blob:
 
     def calculate_mean(self):
         if self.arr is not None:
-            self.mean = (sum([p[0] for p in self.arr]) / len(self.arr), sum([p[1] for p in self.arr]) / len(self.arr))
+            self.mean = (
+                sum([p[0] for p in self.arr]) / len(self.arr), sum([p[1] for p in self.arr]) / len(self.arr))
 
     def dist(self, blob2):
-        return True
+        dx = self.mean[0] - blob2.mean[0]
+        dy = self.mean[1] - blob2.mean[1]
+        return float(np.sqrt(dx * dx + dy * dy))
+
+    def show(self):
+        return "{}:[{}]@({},{})".format(self.id, len(self.arr), show(self.mean[0], 1), show(self.mean[1], 1))
 
 
 def show(x, n=3):
