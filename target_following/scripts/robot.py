@@ -16,7 +16,7 @@ class Robot:
 		rospy.init_node("robot") # feel free to rename	
 		self.pub = rospy.Publisher("robot_0/cmd_vel", Twist, queue_size=0)
 		self.map_sub = rospy.Subscriber("map", OccupancyGrid, self.map_callback, queue_size=1)
-		self.mTo = np.array([[-1, 0, 1, 100], [0, -1, 0, 100], [0, 0, 1, 0], [0, 0, 0, 1]])
+		self.mTo = np.array([[-1, 0, 1, 5], [0, -1, 0, 5], [0, 0, 1, 0], [0, 0, 0, 1]])
 		self.map = None
 		self. rcvr = None
 
@@ -57,9 +57,10 @@ class Robot:
 		rate = rospy.Rate(FREQ)
 
 		poses = self.rcvr.predict() # expect [[x,y],[x,y],...]
+		print(poses)
 		for pose in poses:
 			# transform user-given point in odom to base_link, assume ROBOT CAN'T FLY
-			v = self.mTo.dot( np.transpose(np.array([self.targets[i][0], self.targets[i][1], 0, 1])) )
+			v = self.mTo.dot( np.transpose(np.array([pose[0], pose[1], 0, 1])) )
 			v = v[0:2] # only need x,y because of assumption above
 			# angle to turn i.e. angle btwn x-axis vector and vector of x,y above
 			a = np.arctan2(v[1], v[0])
@@ -71,21 +72,21 @@ class Robot:
 				while not rospy.is_shutdown() and rospy.get_rostime() - start_time < rospy.Duration(a / VEL):
 					vel_msg.angular.z = VEL
 					vel_msg.linear.x = 0
-					self.publisher.publish(vel_msg)
+					self.pub.publish(vel_msg)
 					rate.sleep()
 			else:
 				start_time = rospy.get_rostime()
 				while not rospy.is_shutdown() and rospy.get_rostime() - start_time < rospy.Duration(a / VEL):
 					vel_msg.angular.z = -VEL
 					vel_msg.linear.x = 0
-					self.publisher.publish(vel_msg)
+					self.pub.publish(vel_msg)
 					rate.sleep()
 
 			start_time = rospy.get_rostime()
 			while not rospy.is_shutdown() and rospy.get_rostime() - start_time < rospy.Duration(l / VEL):
 				vel_msg.angular.z = 0
 				vel_msg.linear.x = VEL
-				self.publisher.publish(vel_msg)
+				self.pub.publish(vel_msg)
 				rate.sleep()
 
 if __name__ == "__main__":
