@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import rospy
 from geometry_msgs.msg import Twist
-from world import World
+from world_project import World
 from nav_msgs.msg import Odometry
 import tf
 
@@ -11,6 +11,8 @@ import tf
 FREQ = 10 # Hz
 SLEEP = 2
 pi = 3.14
+LINVELOCITY = 0.2
+ANGVELOCITY = 0.2
 
 class Target:
 	def __init__(self):
@@ -25,11 +27,18 @@ class Target:
 		self.angzvel = 0 # initializing angular velocity at 0 
 		self.angle = 0 # current pose angle
 		
-		self.vel_msg = Twist() # creating inital publish message, which is altered in the main
+		self.trans_msg = Twist()
+		self.rot_msg = Twist() # creating inital publish message, which is altered in the main
 		
 		# creating a subscriber for the map
 		#self.map = None
 		#self.subscriber = rospy.Subscriber("map", OccupancyGrid, self.map_callback, queue_size=1)
+		self.points = [(0, 2), (3.5, 2), (3.5, 4.2), (7.2, 4.2), (7.2, 0), (8.3, 0), (8.3, 8.2), (0, 7.9)]
+		self.goalangles = [pi/2, 0, pi/2, 0, -pi/2, 0, pi/2, -pi+0.02]
+		self.goalangle = self.goalangles[0]
+		self.pointnum = 0
+		self.goalx = self.points[0][0]
+		self.goaly = self.points[0][1]
 		
 		rospy.sleep(2)
 		
@@ -40,102 +49,80 @@ class Target:
 		self.posy = odom_message.pose.pose.position.y
 		# from https://answers.ros.org/question/11545/plotprint-rpy-from-quaternion/#17106
 		(roll, pitch, yaw) = tf.transformations.euler_from_quaternion([odom_message.pose.pose.orientation.x, odom_message.pose.pose.orientation.y, odom_message.pose.pose.orientation.z, odom_message.pose.pose.orientation.w])
-		self.angle = yaw
+		self.angle = yaw	
+	
+	# changing the message to simply rotate the robot
+	def rotate(self): 
+		self.rot_msg.angular.z = ANGVELOCITY
+	
+    # changing the message to stop rotating the robot
+	def stop_rotate(self): 
+		self.rot_msg.angular.z = 0
+	
+    # changing the message to translate the robot
+	def translate(self):
+		self.trans_msg.linear.x = LINVELOCITY
 
-	# function to rotate
-	def rotate(self):
-		self.linxvel = 0
-		self.angzvel = 0.2
+    # changing the message to stop translating the robot
+	def stop_translate(self):
+		self.trans_msg.linear.x = 0
 
-	# move forward
-	def forward(self):
-		self.linxvel = 0.2
-		self.angzvel = 0
+	# checking if the goal angle is equal to the current angle and returning a boolean
+	def check_angle(self):
+		if -0.02 <= self.angle - self.goalangle <= 0.02:
+			return 1
+		else: 
+			return 0
+    
+    # verifying that the robot is at the correxct x 
+	def check_x(self):
+		if -0.1 <= self.posx - self.goalx <= 0.1:
+			return 1
+		else: 
+			return 0
 
+    # verifying that the robot is at the correct y 
+	def check_y(self):
+		if -0.1 <= self.posy - self.goaly <= 0.1:
+			return 1
+		else: 
+			return 0
 
-	def no_move(self):
-		self.linxvel = 0
-		self.angzvel = 0
+	 #updating which points are the goal points
+	def update_goal(self):
+		# incrementing the number of the point we are on
+		self.pointnum = self.pointnum + 1
+		# if the list is over, we are done
+		if self.pointnum >= len(self.points):
+			self.done = 1
+			return
+		# using the next point's information as the goal
+		self.goalx = self.points[self.pointnum][0]
+		self.goaly = self.points[self.pointnum][1]
+		self.goalangle = self.goalangles[self.pointnum]
 
-	# move function that dictates next target velocities and locations without knowing map immediately before
 	def move(self):
+		# checking the angle
+		anglecheck = self.check_angle()
+		if anglecheck==0:
+			# rotate if not correct angle
+			self.rotate()
+			self.pub.publish(self.rot_msg)
+		# if correct angle, check position
+		else:
+			xcheck = self.check_x()
+			ycheck = self.check_y()
+			# translate if not correct position
+			if xcheck==0 or ycheck==0: 
+				self.stop_rotate()
+				self.pub.publish(self.rot_msg)
+				self.translate()
+				self.pub.publish(self.trans_msg)
+			else:
+				self.stop_translate()
+				self.pub.publish(self.trans_msg)
+				self.update_goal()
 
-		# needs to move up 2m 
-		if -0.1 < self.posx and self.posx < 0.1 and self.posy < 2:
-			# at correct angle of 90 to odom, just move up
-			if pi/2 - 0.02 < self.angle and self.angle < pi/2 + 0.02:
-				self.forward()
-			else:
-				self.rotate()
-	
-			return
-
-		# move right 3.5m
-		if self.posx < 3.5 and 1.9 < self.posy and self.posy < 2.1:
-			# at correct angle of 0, just move up
-			if  -0.05 < self.angle and self.angle < 0.02:
-				self.forward()	
-			else:
-				self.rotate()
-			return
-
-		# move up 2.5m 
-		if 3.4 < self.posx and self.posx < 3.6  and self.posy < 4.5:
-			# at correct angle of 90 to odom, just move up
-			if pi/2 - 0.02  < self.angle and self.angle < pi/2 + 0.02:
-				self.forward()
-			else:
-				self.rotate()
-			return
-
-		# move right 4m
-		if self.posx < 7.2 and 4.4 < self.posy and self.posy < 4.6:
-			# at correct angle of 0, just move up
-			if - 0.02  < self.angle and self.angle < 0.02:
-				self.forward()	
-			else:
-				self.rotate()
-			return
-	
-		# move down 4.5m 
-		if 7.1 < self.posx and self.posx < 7.3  and self.posy < 4.6 and self.posy > 0:
-			# at correct angle of -90 to odom, just move up
-			if -pi/2 - 0.02  < self.angle and self.angle < -pi/2 + 0.02:
-				self.forward()
-			else:
-				self.rotate()
-			return
-	
-		# move right 1m
-		if self.posx < 8.3 and -0.2 < self.posy and self.posy < 0.2:
-			# at correct angle of 0, just move up
-			if - 0.02  < self.angle and self.angle < 0.02:
-				self.forward()
-			else:
-				self.rotate()	
-			return
-
-		# move up 8.5 m
-		if 8.2 < self.posx and self.posx < 8.4  and self.posy < 8.2:
-			# at correct angle of 90 to odom, just move up
-			if pi/2 - 0.02  < self.angle and self.angle < pi/2 + 0.02:
-				self.forward()
-			else:
-				self.rotate()	
-			return
-
-		# move left 8.5m
-		if self.posx > 0 and 8.05 < self.posy and self.posy < 8.35:
-			# at correct angle of 180, just move up
-			if pi-0.04 < self.angle and self.angle < pi+0.04:
-				self.forward()
-			else:
-				self.rotate()	
-			return
-
-		if self.posx < 0 and self.posy and self.posy < 8.35:
-			self.no_move()
-		
 		
 	def main(self):
 
@@ -143,14 +130,7 @@ class Target:
 		rate = rospy.Rate(FREQ)
 
 		while not rospy.is_shutdown():
-			self.move() # calling the move function each iteration
-
-			# altering the message to publish the linear and angular velocity decided
-			self.vel_msg.linear.x = self.linxvel
-			self.vel_msg.angular.z = self.angzvel
-			self.pub.publish(self.vel_msg)
-			rate.sleep()
-
+			self.move()
 
 
 
