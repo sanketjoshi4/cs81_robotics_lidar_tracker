@@ -27,8 +27,8 @@ BASE_ANGULAR_VELOCITY = PI / 2
 class Robot:
     def __init__(self):
         rospy.init_node("robot")  # feel free to rename
-        self.publisher = rospy.Publisher("robot_0/cmd_vel", Twist, queue_size=0)
-        self.map_sub = rospy.Subscriber("map", OccupancyGrid, self.map_callback, queue_size=1)
+        self.pub = rospy.Publisher("robot_0/cmd_vel", Twist, queue_size=0)
+        self.world_sub = rospy.Subscriber("map", OccupancyGrid, self.world_callback, queue_size=1)
         self.odom_sub = rospy.Subscriber("robot_0/odom", Odometry, self.odom_callback)
         self.sub_laser = rospy.Subscriber("robot_0/base_scan", LaserScan, self.laser_scan_callback, queue_size=1)
 
@@ -307,6 +307,7 @@ def show(x, n=3):
     intpart = (pad0 + splits[0])[-n:]
     fracpart = pad0 if not frac else (splits[1] + pad0)[:n]
     return ("-" if neg else " ") + intpart + "." + fracpart
+
 
 if __name__ == "__main__":
     # we'll probably set up target like this from main.py?
