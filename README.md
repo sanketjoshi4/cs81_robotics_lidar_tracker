@@ -8,12 +8,14 @@ Paste the package (i.e. target_following directory) in a valid catkin workspace.
 
 `cd path/to/package/scripts`
 
+`chmod +x robot.py` or target.py, depending on which executable you want to test/run.
+
 Run in different windows:
 
 1. `roscore`
 
 2. `rosrun stage_ros stageros PA1.world`
 
-3. `rosrun map_server map_server PA1 /path/to/maze.yaml` (You can use the one in /opt/ (I can't rmb the full path) or whichever)
+3. `rosrun map_server map_server PA1 archipelago.yaml`
 
-4. `rosrun target_following executable_file.py`
+4. `rosrun target_following executable_file_name.py`
