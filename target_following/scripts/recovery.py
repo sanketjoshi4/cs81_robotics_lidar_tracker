@@ -5,20 +5,27 @@ import heapq as hq
 
 
 LOST_THRESH = 10 # s
-EDGE_WEIGHT = 1
+EDGE_WEIGHT = 1 # constant edge weight because everything is 1 grid square away from us, may change this
 
 
 class Recovery:
 	def __init__(self, world):
+		# for path finding
 		self.start = []
 		self.end = []
+
+		# last known pose of target; right now hard-coded, but later Robot should pass this pose to Recovery object
 		self.last_known_pos = Point()
-		self.last_known_pos.x = 4
-		self.last_known_pos.y = 4
-		self.last_known_vel = None
+		self.last_known_pos.x = 4.5
+		self.last_known_pos.y = 4.5
+
+		# robot's current pose (pose at which we adopt recovery mode)
 		self.robot_pos = None
+
+		# output stats for later
 		self.elapsed_lost_time = 0
-		self.predicted_poses = []
+
+		# full knowledge of world
 		self.world = world
 
 	def predict(self):

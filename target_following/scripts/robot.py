@@ -3,7 +3,7 @@ import rospy
 import tf
 import numpy as np
 from geometry_msgs.msg import Twist, Point
-from nav_msgs.msg import OccupancyGrid
+from nav_msgs.msg import OccupancyGrid, Odometry
 from recovery import Recovery
 from world import World
 
@@ -15,23 +15,39 @@ class Robot:
 	def __init__(self):
 		rospy.init_node("robot") # feel free to rename	
 		self.pub = rospy.Publisher("robot_0/cmd_vel", Twist, queue_size=0)
-		self.map_sub = rospy.Subscriber("map", OccupancyGrid, self.map_callback, queue_size=1)
+		self.world_sub = rospy.Subscriber("map", OccupancyGrid, self.world_callback, queue_size=1)
+		self.odom_sub = rospy.Subscriber("robot_0/odom", Odometry, self.odom_callback)
 		self.lis = tf.TransformListener()
-		self.mTo = np.array([[-1, 0, 1, 5], [0, -1, 0, 5], [0, 0, 1, 0], [0, 0, 0, 1]])
+
+		# continually updated info about robot's pose wrt odom
+		self.posx = None
+		self.posy = None
+		self.angle = None
+
+		# useful transformation matrices for movement
+		self.mTo = np.array([[-1, 0, 1, 5], [0, -1, 0, 5], [0, 0, 1, 0], [0, 0, 0, 1]]) # odom to map
 		self.bTo = None # odom to base_link
-		self.map = None
-		self. rcvr = None
+		self.world = None # if we do not use world in here, delete this later
 
 		# TODO: uncomment as you make these files and classes
 		# self.pred = Predictor()
 		# self.id = Identifier()
+		self. rcvr = None
 
 		rospy.sleep(SLEEP)
 
-	def map_callback(self, msg):
+	def odom_callback(self, msg):
+		# getting all of the odom information on the current pose of the robot
+		self.posx = msg.pose.pose.position.x
+		self.posy = msg.pose.pose.position.y
+		# from https://answers.ros.org/question/11545/plotprint-rpy-from-quaternion/#17106
+		(roll, pitch, yaw) = tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
+		self.angle = yaw
+
+	def world_callback(self, msg):
 		print("loading map")
-		self.map = World(msg.data, msg.info.width, msg.info.height, msg.info.resolution, msg.header.frame_id, msg.info.origin)
-		self.rcvr = Recovery(self.map)
+		self.world = World(msg.data, msg.info.width, msg.info.height, msg.info.resolution, msg.header.frame_id, msg.info.origin)
+		self.rcvr = Recovery(self.world)
 
 	def get_transform(self):
 		# get transformation from odom to base_link		
@@ -43,15 +59,9 @@ class Robot:
 		self.bTo = t.dot(r)
 
 	def move(self):
-		# setup code, right now just moves
-		vel_msg = Twist()
+		# TODO: add actual logic to this function
 		# TODO: get predicted x and z velocities from Predictor, combine with Identifier info to calculate move
-
-		rate = rospy.Rate(FREQ)
-		while not rospy.is_shutdown():
-			vel_msg.linear.x = VEL
-			self.pub.publish(vel_msg)
-			rate.sleep()
+		pass
 
 	def main(self):
 		print("in main")
@@ -64,6 +74,7 @@ class Robot:
 		self.rcvr.robot_pos.y = p[1]
 		print(p)
 		print('---')
+		print(self.posx, self.posy, self.angle)
 
 		vel_msg = Twist()
 		rate = rospy.Rate(FREQ)
@@ -103,6 +114,8 @@ class Robot:
 				vel_msg.linear.x = VEL
 				self.pub.publish(vel_msg)
 				rate.sleep()
+		print(self.posx, self.posy, self.angle)
+
 
 if __name__ == "__main__":
 	# we'll probably set up target like this from main.py?
