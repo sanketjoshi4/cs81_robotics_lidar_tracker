@@ -41,6 +41,7 @@ class Target:
 		self.goaly = self.points[0][1]
 		
 		self.is_lost = 0 #1 if the robot is lost from the target
+		self.done = 0 #1 if all the points have been traversed
 
 		rospy.sleep(2)
 		
@@ -78,32 +79,46 @@ class Target:
     
     # verifying that the robot is at the correxct x 
 	def check_x(self):
-		if -0.1 <= self.posx - self.goalx <= 0.1:
+		if -0.08 <= self.posx - self.goalx <= 0.08:
 			return 1
 		else: 
 			return 0
 
     # verifying that the robot is at the correct y 
 	def check_y(self):
-		if -0.1 <= self.posy - self.goaly <= 0.1:
+		if -0.08 <= self.posy - self.goaly <= 0.08:
 			return 1
 		else: 
 			return 0
 
 	 #updating which points are the goal points
 	def update_goal(self):
+
+		# test code to see if lost 
+		#if self.pointnum==2:
+			#self.is_lost = 1
+
+
 		# incrementing the number of the point we are on
 		self.pointnum = self.pointnum + 1
+
 		# decrementing if is lost
-		if self.is_lost==1:
+		if self.is_lost==1 and self.pointnum >= 2:
 			self.pointnum = self.pointnum-2
+
+		# if gone too much, finish 
+		if self.pointnum >= len(self.points):
+			self.done=1
+			return
+		
 		# using the next point's information as the goal
 		self.goalx = self.points[self.pointnum][0]
 		self.goaly = self.points[self.pointnum][1]
 		self.goalangle = self.goalangles[self.pointnum]
+
 		# goal angle is the opposite
 		if self.is_lost==1:
-			self.goalangle = -1*self.goalangle
+			self.goalangle = self.goalangles[self.pointnum+1] - pi + 0.01
 
 	def move(self):
 		# checking the angle
@@ -127,13 +142,14 @@ class Target:
 				self.pub.publish(self.trans_msg)
 				self.update_goal()
 
-		
+	
 	def main(self):
 
 		# setup code
 		rate = rospy.Rate(FREQ)
 
-		while not rospy.is_shutdown():
+		while self.done==0 and not rospy.is_shutdown():
+
 			self.move()
 
 
@@ -152,6 +168,6 @@ class Node:
 		self.prev = other_node
 
 if __name__ == "__main__":
-	# we'll probably set up target like this from main.py?
+
 	t = Target()
 	t.main()
