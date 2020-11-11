@@ -59,9 +59,6 @@ class Target:
 
 	# move function that dictates next target velocities and locations without knowing map immediately before
 	def move(self):
-		print self.posx
-		print self.posy
-		print self.angle
 
 		# needs to move up 2m 
 		if -0.1 < self.posx and self.posx < 0.1 and self.posy < 2:
