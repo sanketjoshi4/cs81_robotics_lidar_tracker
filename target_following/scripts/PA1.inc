@@ -2,7 +2,7 @@ define lidar ranger
 (
   sensor
   (
-    range [0 20]
+    range [0 40]
     fov 360.0
     samples 721
   )

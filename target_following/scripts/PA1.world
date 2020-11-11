@@ -17,12 +17,12 @@ define floorplan model
   #ranger_return 1
 )
 
-resolution 0.1
+resolution 0.05
 interval_sim 10  # simulation timestep in milliseconds
 
 window
 (
-  size [ 500.0 500.0 ]
+  size [ 700.0 700.0 ]
   center [ 0.0 0.0 ]
   rotate [ 0.0 0.0 ]
   scale 10
@@ -33,15 +33,15 @@ window
 floorplan
 (
   name "PA1"
-  bitmap "empty.pgm"
-  size [ 20.4 20.4 1.0 ]
-  pose [ 0.0 0.0 0.0 0.0 ]
+  bitmap "archipelago.png"
+  size [ 10.0 10.0 1.0 ]
+  pose [ 5.0 5.0 0.0 0.0 ]
 )
 
 # throw in a robot
 rosbot
 (
-  pose [ 0.0 0.0 0.0 180.0 ]
+  pose [ 5.0 5.0 0.0 180.0 ]
   name "rosbot"
   color "blue"
 )
@@ -49,7 +49,7 @@ rosbot
 # and another one
 rosbot
 (
-  pose [ 1.0 0.0 0.0 180.0 ]
+  pose [ 6.0 5.0 0.0 180.0 ]
   name "rosbot"
   color "green"
 )
