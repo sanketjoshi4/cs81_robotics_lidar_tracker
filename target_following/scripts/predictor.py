@@ -31,8 +31,8 @@ class Predictor:
 		total_linvel=0
 		total_angvel=0
 		for pose in list_poses:
-			total_linvel += pose.linvel
-			total_angvel += pose.angvel
+			total_linvel += pose.get_linvel()
+			total_angvel += pose.get_angvel()
 		# treating each velocity with an equal probability, so taking average linear and angular velocity
 		self.pred_linvel = total_linvel/(len(list_poses))
 		self.pred_angvel = total_angvel/(len(list_poses))
@@ -56,7 +56,7 @@ class Pose:
 	def get_linvel(self):
 		return self.linvel
 
-	def ge_angvel(self):
+	def get_angvel(self):
 		return self.angvel
 		
 
