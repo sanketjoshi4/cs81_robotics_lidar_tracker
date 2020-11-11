@@ -40,6 +40,8 @@ class Target:
 		self.goalx = self.points[0][0]
 		self.goaly = self.points[0][1]
 		
+		self.is_lost = 0 #1 if the robot is lost from the target
+
 		rospy.sleep(2)
 		
 	# from Archita pa1, modified slightly
@@ -92,14 +94,16 @@ class Target:
 	def update_goal(self):
 		# incrementing the number of the point we are on
 		self.pointnum = self.pointnum + 1
-		# if the list is over, we are done
-		if self.pointnum >= len(self.points):
-			self.done = 1
-			return
+		# decrementing if is lost
+		if self.is_lost==1:
+			self.pointnum = self.pointnum-2
 		# using the next point's information as the goal
 		self.goalx = self.points[self.pointnum][0]
 		self.goaly = self.points[self.pointnum][1]
 		self.goalangle = self.goalangles[self.pointnum]
+		# goal angle is the opposite
+		if self.is_lost==1:
+			self.goalangle = -1*self.goalangle
 
 	def move(self):
 		# checking the angle
