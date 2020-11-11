@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import rospy
 from geometry_msgs.msg import Twist
-from identifier.py import Identifier # importing Identifier
+#from identifier.py import Identifier # importing Identifier
 
 # PREDICTOR.PY 
 # class to predict robot movement
@@ -24,10 +24,10 @@ class Predictor:
 		# creating new instance of pose class
 		target = Pose(posx, posy, linvel, angvel)
 		# adding new pose to the poses list
-		poses.append(target)
+		self.poses.append(target)
 
 	# given poses, return robot intended linear and angular velocity
-	def predict(self, list_poses, key): 
+	def predict(self, list_poses): 
 		total_linvel=0
 		total_angvel=0
 		for pose in list_poses:
@@ -36,7 +36,16 @@ class Predictor:
 		# treating each velocity with an equal probability, so taking average linear and angular velocity
 		self.pred_linvel = total_linvel/(len(list_poses))
 		self.pred_angvel = total_angvel/(len(list_poses))
+		print "Predicted velociy linear: \n" 
+		print self.pred_linvel 
+		print "\n Predicted vel angular: \n"
+		print self.pred_angvel
+	
 
+	#def main(self):
+		#while not rospy.is_shutdown():
+			#self.update_targetpos(self.posx, self.posy, self.linvel, self.angvel)
+			#self.predict()
 
 # mini class that has all the current information on target's whereabouts
 class Pose:
@@ -59,8 +68,9 @@ class Pose:
 	def get_angvel(self):
 		return self.angvel
 		
+if __name__ == "__main__":
 
-		
-		
+	p = Predictor()
+	p.main()
 
 	

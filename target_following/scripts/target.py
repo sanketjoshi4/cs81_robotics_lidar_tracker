@@ -4,6 +4,7 @@ from geometry_msgs.msg import Twist
 from world_project import World
 from nav_msgs.msg import Odometry
 import tf
+from predictor import Predictor 
 
 # TARGET.PY 
 # class for the target object 
@@ -43,6 +44,9 @@ class Target:
 		self.is_lost = 0 #1 if the robot is lost from the target
 		self.done = 0 #1 if all the points have been traversed
 
+		#to test predictor
+		#self.predictor = Predictor()
+
 		rospy.sleep(2)
 		
 	# from Archita pa1, modified slightly
@@ -57,18 +61,22 @@ class Target:
 	# changing the message to simply rotate the robot
 	def rotate(self): 
 		self.rot_msg.angular.z = ANGVELOCITY
+		self.angzvel = ANGVELOCITY
 	
     # changing the message to stop rotating the robot
 	def stop_rotate(self): 
 		self.rot_msg.angular.z = 0
+		self.angzvel = 0
 	
     # changing the message to translate the robot
 	def translate(self):
 		self.trans_msg.linear.x = LINVELOCITY
+		self.linxvel = LINVELOCITY
 
     # changing the message to stop translating the robot
 	def stop_translate(self):
 		self.trans_msg.linear.x = 0
+		self.linxvel = 0
 
 	# checking if the goal angle is equal to the current angle and returning a boolean
 	def check_angle(self):
@@ -151,6 +159,9 @@ class Target:
 		while self.done==0 and not rospy.is_shutdown():
 
 			self.move()
+			# to test predictor
+			#self.predictor.update_targetpos(self.posx, self.posy, self.linxvel, self.angzvel)
+			#self.predictor.predict(self.predictor.poses)
 
 
 
