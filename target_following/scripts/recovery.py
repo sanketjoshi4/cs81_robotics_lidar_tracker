@@ -5,20 +5,27 @@ import heapq as hq
 
 
 LOST_THRESH = 10 # s
-EDGE_WEIGHT = 1
+EDGE_WEIGHT = 1 # constant edge weight because everything is 1 grid square away from us, may change this
 
 
 class Recovery:
 	def __init__(self, world):
+		# for path finding
 		self.start = []
 		self.end = []
+
+		# last known pose of target; right now hard-coded, but later Robot should pass this pose to Recovery object
 		self.last_known_pos = Point()
-		self.last_known_pos.x = 102
-		self.last_known_pos.y = 100
-		self.last_known_vel = None
+		self.last_known_pos.x = 4.5
+		self.last_known_pos.y = 4.5
+
+		# robot's current pose (pose at which we adopt recovery mode)
 		self.robot_pos = None
+
+		# output stats for later
 		self.elapsed_lost_time = 0
-		self.predicted_poses = []
+
+		# full knowledge of world
 		self.world = world
 
 	def predict(self):
@@ -40,8 +47,8 @@ class Recovery:
 		self.start = [start_cell_x, start_cell_y]
 		self.end = [end_cell_x, end_cell_y]
 
+
 		path = self.a_star()
-		print(path)
 		return self.get_path_poses(path)
 	
 	def diagonal(self, curr_x, curr_y):
@@ -74,15 +81,15 @@ class Recovery:
 		while len(open_set) > 0:
 			# get next lowest in open set; 1st index is Cell obj because 0th index is diagonal
 			curr = hq.heappop(open_set)[1]
-			print(curr)
 
 			# we've found goal, back trace and return
 			if curr == goal:
+				print("found")
 				path = []
 				while curr in closed_set:
 					path.append(curr)
 					curr = closed_set[curr]
-				path.append(curr)
+				#path.append(curr)
 				path.reverse()
 				return path # [start, a, b, c, ..., goal]
 
@@ -92,7 +99,7 @@ class Recovery:
 			for ny in range(max(0, cy - 1), min(cy + 2, self.world.height)):
 				for nx in range(max(0, cx - 1), min(cx + 2, self.world.width)):
 					# if not current cell and doesn't have obstacle
-					if cy != ny and cx != nx and not self.world.get_cell(cx, ny):
+					if (cy != ny or cx != nx) and not self.world.get_cell(cx, ny):
 						n = Cell([nx, ny])
 						temp_g = g_vals[curr] + EDGE_WEIGHT
 						# if cost from start to n is lowest so far, or no cost calculated yet
@@ -108,7 +115,7 @@ class Recovery:
 							hq.heappush(open_set, (temp_f, n))
 							hq.heapify(open_set)
 
-		return None
+		return []
 
 	def get_path_poses(self, path):
 		"""

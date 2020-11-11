@@ -22,6 +22,7 @@ class World:
 		rpy = tf.transformations.euler_from_quaternion((origin.orientation.x, origin.orientation.y, origin.orientation.z, origin.orientation.w))
 		self.origin.append(rpy[2]) # yaw is 3rd element
 		self.T = np.array([[np.cos(self.origin[2]), -np.sin(self.origin[2]), 0, self.origin[0]], [np.sin(self.origin[2]), np.cos(self.origin[2]), 0, self.origin[1]], [0, 0, 1, 0], [0, 0, 0, 1]]) # transformation matrix from occ_grid to map frame
+		print(self.T)
 
 	def get_cell(self, x, y):
 		""" Return whether cell at x,y index has obstacle """
