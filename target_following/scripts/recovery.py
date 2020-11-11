@@ -13,8 +13,8 @@ class Recovery:
 		self.start = []
 		self.end = []
 		self.last_known_pos = Point()
-		self.last_known_pos.x = 5
-		self.last_known_pos.y = 5.1
+		self.last_known_pos.x = 4
+		self.last_known_pos.y = 4
 		self.last_known_vel = None
 		self.robot_pos = None
 		self.elapsed_lost_time = 0
@@ -82,7 +82,7 @@ class Recovery:
 				while curr in closed_set:
 					path.append(curr)
 					curr = closed_set[curr]
-				path.append(curr)
+				#path.append(curr)
 				path.reverse()
 				return path # [start, a, b, c, ..., goal]
 
