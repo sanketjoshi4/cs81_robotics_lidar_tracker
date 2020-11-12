@@ -46,6 +46,11 @@ class Robot:
         self.lis = tf.TransformListener()
         self.pose = {"x": 0, "y": 0, "z": 0}  # TODO : MERGE
         self.pose_last_scan = {"x": 0, "y": 0, "z": 0}  # TODO : MERGE
+
+        self.last_posx = None
+        self.last_posy = None
+        self.last_angle = None
+
         self.time_last_scan = None  # TODO : MERGE
         self.rcvr = None
 
@@ -93,75 +98,66 @@ class Robot:
         if self.time_last_scan is None or (curr_time - self.time_last_scan > 1 / SCAN_FREQ):
             self.time_last_scan = curr_time
 
-            # TODO : calculate the movement_transform matrix, which converts points in current frame,
-            # to as they would be seen in the last frame when scanner ran
+            # print "Pose: ({}, {}, {})".format(show(self.posx), show(self.posy), show(self.angle))
+            # print "LPos: ({}, {}, {})".format(show(self.last_posx), show(self.last_posy), show(self.last_angle))
             movement_transform = None
-            self.pose_last_scan = self.pose
-            self.id.blobify(laser_scan_msg)
-            # self.id.classify(None, movement_transform)
+            if self.posx is not None and self.last_posx is not None:
+                movement_transform = Robot.get_ref_change_xform(
+                    self.posx, self.posy, self.angle, self.last_posx, self.last_posy, self.last_angle)
 
-    def update_pose(self):
-        # TODO : Publish to map frame, change base_link to map
-        (trans, rot) = self.listener.lookupTransform('base_link', 'base_laser_link', rospy.Time(0))
-        trans_mat = tf.transformations.translation_matrix(trans)
-        rot_mat = tf.transformations.quaternion_matrix(rot)
-        pose = trans_mat.dot(rot_mat).dot(np.transpose(np.array([0, 0, 0, 1])))
-        self.pose = {"x": pose[0][0], "y": pose[1][0], "z": pose[2][0]}
-        print pose
-        pass
+            self.last_posx = self.posx
+            self.last_posy = self.posy
+            self.last_angle = self.angle
 
-    def main(self):
-        print("in main")
-        while self.rcvr is None:
-            continue
+            if self.posx is not None:
+                self.id.blobify(laser_scan_msg)
+            if self.posx is not None and self.last_posx is not None:
+                self.id.classify(movement_transform)
 
-        self.rcvr.robot_pos = Point()
-        p = self.mTo.dot(np.transpose(np.array([0, 0, 0, 1])))[0:2]
-        self.rcvr.robot_pos.x = p[0]
-        self.rcvr.robot_pos.y = p[1]
-        print(p)
-        print('---')
+            target_pos = self.get_target_pos()
+            if target_pos is not None:
+                print "Target @ ({},{})".format(target_pos[0], target_pos[1])
+            else:
+                print "TARGET: Not found"
+
+    @staticmethod
+    def get_ref_change_xform(x1, y1, z1, x2, y2, z2):
+        sz1 = np.sin(z1)
+        cz1 = np.cos(z1)
+        mat1 = np.matrix([[cz1, -sz1, x1], [sz1, cz1, y1], [0, 0, 1]])
+
+        sz2 = np.sin(z2)
+        cz2 = np.cos(z2)
+        mat2 = np.matrix([[cz2, -sz2, x2], [sz2, cz2, y2], [0, 0, 1]])
+
+        return mat2.getI().dot(mat1)
+
+    def simple_main(self):
         print(self.posx, self.posy, self.angle)
-
         vel_msg = Twist()
         rate = rospy.Rate(FREQ)
+        start_time = rospy.get_rostime()
 
-        poses = self.rcvr.predict()  # expect [[x,y],[x,y],...]
-        print(poses)
-        for pose in poses:
-            # transform user-given point in odom to base_link, assume ROBOT CAN'T FLY
-            self.get_transform()
-            v = np.linalg.inv(self.mTo).dot(np.transpose(np.array([pose[0], pose[1], 0, 1])))
-            v = self.bTo.dot(v)
-            v = v[0:2]  # only need x,y because of assumption above
-            print(v)
-            # angle to turn i.e. angle btwn x-axis vector and vector of x,y above
-            a = np.arctan2(v[1], v[0])
-            # euclidean distance to travel, assume no movement in z-axis
-            l = np.linalg.norm(np.array([0, 0]) - v)
-            start_time = rospy.get_rostime()
-            if a >= 0:  # anticlockwise rot (or no rot)
-                start_time = rospy.get_rostime()
-                while not rospy.is_shutdown() and rospy.get_rostime() - start_time < rospy.Duration(a / VEL):
-                    vel_msg.angular.z = VEL
-                    vel_msg.linear.x = 0
-                    self.pub.publish(vel_msg)
-                    rate.sleep()
-            else:
-                start_time = rospy.get_rostime()
-                while not rospy.is_shutdown() and rospy.get_rostime() - start_time < rospy.Duration(-a / VEL):
-                    vel_msg.angular.z = -VEL
-                    vel_msg.linear.x = 0
-                    self.pub.publish(vel_msg)
-                    rate.sleep()
+        while not rospy.is_shutdown() and rospy.get_rostime() - start_time < rospy.Duration(100):
+            vel_msg.angular.z = 0
+            vel_msg.linear.x = VEL
+            self.pub.publish(vel_msg)
+            rate.sleep()
 
-            start_time = rospy.get_rostime()
-            while not rospy.is_shutdown() and rospy.get_rostime() - start_time < rospy.Duration(l / VEL):
-                vel_msg.angular.z = 0
-                vel_msg.linear.x = VEL
-                self.pub.publish(vel_msg)
-                rate.sleep()
-        print(self.posx, self.posy, self.angle)
+    def get_target_pos(self):
+
+        if self.id.target is None:
+            return None
+
+        tx = self.id.target.mean[0]
+        ty = self.id.target.mean[0]
+
+        sz = np.sin(self.angle)
+        cz = np.cos(self.angle)
+
+        t_pose = np.matrix([[cz, -sz, self.posx], [sz, cz, self.posy], [0, 0, 1]]).dot(np.array([[tx], [ty], [1]]))
+
+        return float(t_pose[0][0]), float(t_pose[1][0])
 
 
 class Identifier:
@@ -169,13 +165,13 @@ class Identifier:
     THRESH_RADIALLY_SEPARATE = 2.0
 
     # The maximum distance a blob's mean can move to imply that it's stationary
-    THRESH_BLOB_STATIC = 0.1
+    THRESH_BLOB_STATIC = 0.5
 
     # The maximum distance a blob's mean can move to imply that it's moving
     # This is not set as the minimum since it is difficult to match a blob with it's last scan
     # Hence, we compare with all blobs in the last scan and the ones that have a large difference are probably
     # Different blobs and the ones with a small distance, but greater than THRESH_BLOB_STATIC, are moving blobs
-    THRESH_BLOB_MOVEMENT = 0.1
+    THRESH_BLOB_MOVEMENT = 2.0
 
     # Below are the statuses based on distance from target
     STATUS_CLOSE = 1
@@ -190,7 +186,7 @@ class Identifier:
     DIST_MAX_OK = 10
     DIST_MAX_FAR = 20
 
-    def __init__(self):  # All w.r.t. bot
+    def __init__(self):  # All in the robot's frame of reference
         self.blobs = {}  # dict of blob_id to Blob item
         self.last_blobs = {}  # blobs during last scan
         self.target = None  # (x, y)
@@ -225,24 +221,37 @@ class Identifier:
         for blob_id, blob in self.blobs.items():
             blob.calculate_mean()
 
-        print [b.show() for b in self.blobs.values()]
+        # Print blobs
+        # print [b.show() for b in self.blobs.values()]
 
-    def classify(self, movement_transform=None):
+    def classify(self, movement_transform):
 
         # TODO : target.pos, [obs] <- blobs
         # Pick out moving blobs
         obs = []
         target = None
+        shift_min_target = None
+
         for blob_id, blob in self.blobs.items():
+
             for last_blob_id, last_blob in self.last_blobs.items():
-                last_blob_in_curr_frame = None  # TODO : Apply movement_transform to correct for robot movement
-                dist = blob.dist(last_blob_in_curr_frame)
-                if dist < Identifier.THRESH_BLOB_STATIC:
+
+                last_mean = np.array([[last_blob.mean[0]], [last_blob.mean[1]], [1]])
+                last_mean_now = movement_transform.dot(last_mean)
+                dx = last_mean_now[0][0] - blob.mean[0]
+                dy = last_mean_now[1][0] - blob.mean[1]
+                shift = float(np.sqrt(dx * dx + dy * dy))
+
+                if shift < Identifier.THRESH_BLOB_STATIC:
                     obs.append(blob)
+                    # print "obs id'd : {}".format(blob.show())
                     continue
-                elif dist < Identifier.THRESH_BLOB_MOVEMENT:
-                    target = blob
-                    continue
+
+                elif shift < Identifier.THRESH_BLOB_MOVEMENT:
+
+                    if shift_min_target is None or shift < shift_min_target:
+                        target = blob
+                        shift_min_target = shift
 
         self.obs = obs
         self.target = target
@@ -289,7 +298,7 @@ class Blob:
         return "{}:[{}]@({},{})".format(self.id, len(self.arr), show(self.mean[0], 1), show(self.mean[1], 1))
 
 
-def show(x, n=3):
+def show(x, n=2):
     """
     This formats a number for better readability in the log, so that they are vertically aligned
         show (1.0, n=3)         = " 001.000"       # Padded on both sides
@@ -297,6 +306,8 @@ def show(x, n=3):
         show (-1.2, n=3)        = "-001.200"       # Aligns negative numbers with positive
         show (1111.0, n=3)      = " 111.000"       # Capped to 3 on both sides of decimal
     """
+    if x is None:
+        return ""
 
     neg = x < 0
     x = round(abs(x), n)
@@ -312,4 +323,4 @@ def show(x, n=3):
 if __name__ == "__main__":
     # we'll probably set up target like this from main.py?
     r = Robot()
-    r.main()
+    r.simple_main()

@@ -3,8 +3,8 @@ define lidar ranger
   sensor
   (
     range [0 40]
-    fov 360.0
-    samples 721
+    fov 90.0
+    samples 181
   )
   # generic model properties
   color "black"
@@ -24,7 +24,7 @@ define rosbot position
   drive "diff"
   color "gray"
   
-  lidar(pose [ 0.0 0.0 0.1 0.0 ])
+  lidar(pose [ 0.0 0.0 -0.1 0.0 ])
 )
 
 

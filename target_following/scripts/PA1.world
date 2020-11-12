@@ -41,7 +41,7 @@ floorplan
 # throw in a robot
 rosbot
 (
-  pose [ 5.0 5.0 0.0 180.0 ]
+  pose [ 5.0 5.0 0.0 0.0 ]
   name "rosbot"
   color "blue"
 )
@@ -49,7 +49,7 @@ rosbot
 # and another one
 rosbot
 (
-  pose [ 6.0 5.0 0.0 180.0 ]
+  pose [ 6.0 5.0 0.0 0.0 ]
   name "rosbot"
   color "green"
 )

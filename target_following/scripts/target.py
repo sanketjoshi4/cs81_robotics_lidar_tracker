@@ -8,6 +8,8 @@ from geometry_msgs.msg import Twist
 FREQ = 10 # Hz
 SLEEP = 2
 
+VEL = 0.1
+
 class Target:
 	def __init__(self):
 		rospy.init_node("target") # target node 
@@ -16,14 +18,14 @@ class Target:
 
 		self.posx = 0 # initalizing target x position at 0
 		self.posy = 0 # initializing target y position at 0
-		self.linxvel = 0.1 # initializing linear velocity at 0 
+		self.linxvel = VEL # initializing linear velocity at 0
 		self.angzvel = 0 # initializing angular velocity at 0 
 		
 		self.vel_msg = Twist() # creating inital publish message, which is altered in the main
 
 	# move function that dictates next target velocities and locations
 	def move(self):
-		continue
+		pass
 
 	def main(self):
 
