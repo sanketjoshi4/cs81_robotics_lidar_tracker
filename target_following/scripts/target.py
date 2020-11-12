@@ -157,8 +157,7 @@ class Target:
 
 	
 	def main(self):
-		# setup code
-		vel_msg = Twist()
+
 		rate = rospy.Rate(FREQ)
 
 		while self.done==0 and not rospy.is_shutdown():
