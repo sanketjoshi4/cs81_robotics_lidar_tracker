@@ -4,6 +4,7 @@ import tf
 import numpy as np
 from geometry_msgs.msg import Twist, Point
 from nav_msgs.msg import OccupancyGrid, Odometry
+from std_msgs.msg import Bool
 from recovery import Recovery
 from world import World
 
@@ -15,6 +16,7 @@ class Robot:
 	def __init__(self):
 		rospy.init_node("robot") # feel free to rename	
 		self.pub = rospy.Publisher("robot_0/cmd_vel", Twist, queue_size=0)
+		self.stat_pub = rospy.Publisher("visible_status", Bool, queue_size=0) # latest one only
 		self.world_sub = rospy.Subscriber("map", OccupancyGrid, self.world_callback, queue_size=1)
 		self.odom_sub = rospy.Subscriber("robot_0/odom", Odometry, self.odom_callback)
 		self.lis = tf.TransformListener()
@@ -43,6 +45,12 @@ class Robot:
 		# from https://answers.ros.org/question/11545/plotprint-rpy-from-quaternion/#17106
 		(roll, pitch, yaw) = tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
 		self.angle = yaw
+		# TEST CODE for visible_status pub
+		
+	def pub_visibility(self, visible):
+		msg = Bool()
+		msg.data = visible # expect boolean
+		self.stat_pub.publish(msg)
 
 	def world_callback(self, msg):
 		print("loading map")
@@ -115,6 +123,8 @@ class Robot:
 				self.pub.publish(vel_msg)
 				rate.sleep()
 		print(self.posx, self.posy, self.angle)
+		self.pub_visibility(True)
+		self.pub_visibility(False)
 
 
 if __name__ == "__main__":
