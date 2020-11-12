@@ -16,6 +16,6 @@ Run in different windows:
 
 2. `rosrun stage_ros stageros PA1.world`
 
-3. `rosrun map_server map_server PA1 archipelago.yaml`
+3. `rosrun map_server map_server archipelago.yaml`
 
 4. `rosrun target_following executable_file_name.py`
