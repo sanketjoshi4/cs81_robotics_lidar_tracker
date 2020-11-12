@@ -2,7 +2,7 @@
 import rospy
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Bool
-from world_project import World
+from world import World
 from nav_msgs.msg import Odometry
 import tf
 from predictor import Predictor 
@@ -52,7 +52,12 @@ class Target:
 		rospy.sleep(2)
 
 	def visibility_callback(self, msg):
-		print(msg.data)    
+		# if lost, 
+		if msg.data==False:
+			self.is_lost=1
+		# if not lost
+		else:
+			self.is_lost=0    
     
 	# from Archita pa1, modified slightly
 	def odom_callback(self, odom_message):
@@ -158,7 +163,7 @@ class Target:
 	
 	def main(self):
 		# setup code
-		vel_msg = Twist()
+
 		rate = rospy.Rate(FREQ)
 
 		while self.done==0 and not rospy.is_shutdown():
