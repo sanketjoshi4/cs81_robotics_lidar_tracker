@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import rospy
 from geometry_msgs.msg import Twist
+from std_msgs.msg import Bool
 from world_project import World
 from nav_msgs.msg import Odometry
 import tf
@@ -17,8 +18,9 @@ ANGVELOCITY = 0.2
 
 class Target:
 	def __init__(self):
-		rospy.init_node("target") # target node 
+		rospy.init_node("target") # feel free to rename
 		self.pub = rospy.Publisher("robot_1/cmd_vel", Twist, queue_size=0)
+		self.stat_sub = rospy.Subscriber("visible_status", Bool, self.visibility_callback, queue_size=None)
 		self.sub = rospy.Subscriber("robot_1/odom", Odometry, self.odom_callback)
 		rospy.sleep(SLEEP)
 
@@ -48,7 +50,10 @@ class Target:
 		#self.predictor = Predictor()
 
 		rospy.sleep(2)
-		
+
+	def visibility_callback(self, msg):
+		print(msg.data)    
+    
 	# from Archita pa1, modified slightly
 	def odom_callback(self, odom_message):
 		# getting all of the odom information on the current pose of the robot
@@ -152,12 +157,11 @@ class Target:
 
 	
 	def main(self):
-
 		# setup code
+		vel_msg = Twist()
 		rate = rospy.Rate(FREQ)
 
 		while self.done==0 and not rospy.is_shutdown():
-
 			self.move()
 			# to test predictor
 			#self.predictor.update_targetpos(self.posx, self.posy, self.linxvel, self.angzvel)

@@ -16,6 +16,6 @@ Run in different windows:
 
 2. `rosrun stage_ros stageros PA1.world`
 
-3. `rosrun map_server map_server archipelago.yaml`
+3. `rosrun map_server map_server maze.yaml` OR `archipelago.yaml` if we have moved to that map (MAKE SURE MAP IMAGE IN PA1.world MATCHES!!!)
 
 4. `rosrun target_following executable_file_name.py`
