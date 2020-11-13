@@ -6,13 +6,14 @@ from world import World
 from nav_msgs.msg import Odometry
 import tf
 from predictor import Predictor 
+import numpy as np
 
 # TARGET.PY 
 # class for the target object 
 
 FREQ = 10 # Hz
 SLEEP = 2
-pi = 3.14
+PI = np.pi
 LINVELOCITY = 0.2
 ANGVELOCITY = 0.2
 
@@ -20,7 +21,7 @@ class Target:
 	def __init__(self):
 		rospy.init_node("target") # feel free to rename
 		self.pub = rospy.Publisher("robot_1/cmd_vel", Twist, queue_size=0)
-		self.stat_sub = rospy.Subscriber("visible_status", Bool, self.visibility_callback, queue_size=None)
+		self.stat_sub = rospy.Subscriber("visible_status", Bool, self.visibility_callback, queue_size=1) # only care about most recent msg
 		self.sub = rospy.Subscriber("robot_1/odom", Odometry, self.odom_callback)
 		rospy.sleep(SLEEP)
 
@@ -37,7 +38,7 @@ class Target:
 		#self.map = None
 		#self.subscriber = rospy.Subscriber("map", OccupancyGrid, self.map_callback, queue_size=1)
 		self.points = [(0, 2), (3.5, 2), (3.5, 4.2), (7.2, 4.2), (7.2, 0), (8.3, 0), (8.3, 8.2), (0, 7.9)]
-		self.goalangles = [pi/2, 0, pi/2, 0, -pi/2, 0, pi/2, -pi+0.02]
+		self.goalangles = [PI/2, 0, PI/2, 0, -PI/2, 0, PI/2, -PI+0.02]
 		self.goalangle = self.goalangles[0]
 		self.pointnum = 0
 		self.goalx = self.points[0][0]
@@ -136,7 +137,7 @@ class Target:
 
 		# goal angle is the opposite
 		if self.is_lost==1:
-			self.goalangle = self.goalangles[self.pointnum+1] - pi + 0.01
+			self.goalangle = self.goalangles[self.pointnum+1] - PI + 0.01
 
 	def move(self):
 		# checking the angle
