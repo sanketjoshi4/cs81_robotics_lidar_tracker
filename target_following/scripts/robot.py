@@ -195,11 +195,17 @@ class Identifier:
     DIST_MAX_FAR = 20
 
     def __init__(self):  # All in the robot's frame of reference
+
         self.blobs = {}  # dict of blob_id to Blob item
-        self.last_blobs = {}  # blobs during last scan
         self.target = None  # (x, y)
-        self.last_target = None  # (x, y)
         self.obs = None  # list of Blob items
+        self.target_vel = None  # list of Blob items
+
+        self.last_blobs = {}  # blobs during last scan
+        self.last_target = None  # (x, y)
+        self.last_obs = None  # list of Blob items
+        self.last_target_vel = None
+
         self.status = None  # Amongst
 
     def blobify(self, laser_scan_msg):
@@ -251,7 +257,6 @@ class Identifier:
 
             for blob_id, blob in self.blobs.items():
 
-                # TODO : invert mov trans?
                 # if last_blob_id == blob_id:
                 #     print "\nBLOB_IDs : {}, {}".format(last_blob_id, blob_id)
                 #     print "Last : ({}, {})".format(show(last_mean_now[0][0]), show(last_mean_now[1][0]))
@@ -279,9 +284,18 @@ class Identifier:
                 # else:
                 #     print "NO MATCH"
 
+        self.last_obs = copy.deepcopy(self.obs)
+        self.last_target = copy.deepcopy(self.target)  # in base_scan ref
+        self.last_target_vel = copy.deepcopy(self.target_vel)  # in base_scan ref
+
         self.obs = obs
         self.target = target  # in base_scan ref
-        # TODO : target.lin_vel <- (target.pos, target.last_pos)
+        if self.target is not None and self.last_target is not None:
+            dx = self.target.mean[0] - self.last_target.mean[0]
+            dy = self.target.mean[1] - self.last_target.mean[1]
+            self.target_vel = (dx, dy)
+        else:
+            self.target_vel = None
 
     def status(self):
         if self.target is None:
