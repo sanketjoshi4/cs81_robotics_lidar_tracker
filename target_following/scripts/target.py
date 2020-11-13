@@ -11,11 +11,14 @@ import numpy as np
 # TARGET.PY 
 # class for the target object 
 
-FREQ = 10 # Hz
+FREQ = 10  # Hz
 SLEEP = 2
 PI = np.pi
 LINVELOCITY = 0.2
 ANGVELOCITY = 0.2
+
+VEL = 0.1
+
 
 class Target:
 	def __init__(self):
@@ -75,33 +78,33 @@ class Target:
 		self.angzvel = ANGVELOCITY
 	
     # changing the message to stop rotating the robot
-	def stop_rotate(self): 
-		self.rot_msg.angular.z = 0
-		self.angzvel = 0
-	
+    def stop_rotate(self):
+        self.rot_msg.angular.z = 0
+        self.angzvel = 0
+
     # changing the message to translate the robot
-	def translate(self):
-		self.trans_msg.linear.x = LINVELOCITY
-		self.linxvel = LINVELOCITY
+    def translate(self):
+        self.trans_msg.linear.x = LINVELOCITY
+        self.linxvel = LINVELOCITY
 
     # changing the message to stop translating the robot
-	def stop_translate(self):
-		self.trans_msg.linear.x = 0
-		self.linxvel = 0
+    def stop_translate(self):
+        self.trans_msg.linear.x = 0
+        self.linxvel = 0
 
-	# checking if the goal angle is equal to the current angle and returning a boolean
-	def check_angle(self):
-		if -0.02 <= self.angle - self.goalangle <= 0.02:
-			return 1
-		else: 
-			return 0
-    
+    # checking if the goal angle is equal to the current angle and returning a boolean
+    def check_angle(self):
+        if -0.02 <= self.angle - self.goalangle <= 0.02:
+            return 1
+        else:
+            return 0
+
     # verifying that the robot is at the correxct x 
-	def check_x(self):
-		if -0.08 <= self.posx - self.goalx <= 0.08:
-			return 1
-		else: 
-			return 0
+    def check_x(self):
+        if -0.08 <= self.posx - self.goalx <= 0.08:
+            return 1
+        else:
+            return 0
 
     # verifying that the robot is at the correct y 
 	def check_y(self):
@@ -174,21 +177,20 @@ class Target:
 			#self.predictor.predict(self.predictor.poses)
 
 
-
 # class for the points on grid, copied from pa3 Archita
 class Node:
-	# initializing basic values of the node
-	def __init__(self, x, y, grid, goalx, goaly):
-		#self.value = grid.get_cell(x, y)
-		self.x = x
-		self.y = y
-		self.prev = None
-	
-	# setting the previous node
-	def set_prev(self, other_node):
-		self.prev = other_node
+    # initializing basic values of the node
+    def __init__(self, x, y, grid, goalx, goaly):
+        # self.value = grid.get_cell(x, y)
+        self.x = x
+        self.y = y
+        self.prev = None
+
+    # setting the previous node
+    def set_prev(self, other_node):
+        self.prev = other_node
+
 
 if __name__ == "__main__":
-
-	t = Target()
-	t.main()
+    t = Target()
+    t.main()
