@@ -5,7 +5,7 @@ from std_msgs.msg import Bool
 from world import World
 from nav_msgs.msg import Odometry
 import tf
-from predictor import Predictor 
+from predictor import Predictor
 import numpy as np
 
 # TARGET.PY 
@@ -30,13 +30,13 @@ class Target:
 
 		self.posx = 0 # initalizing target x position at 0
 		self.posy = 0 # initializing target y position at 0
-		self.linxvel = 0 # initializing linear velocity at 0 
-		self.angzvel = 0 # initializing angular velocity at 0 
+		self.linxvel = 0 # initializing linear velocity at 0
+		self.angzvel = 0 # initializing angular velocity at 0
 		self.angle = 0 # current pose angle
-		
+
 		self.trans_msg = Twist()
 		self.rot_msg = Twist() # creating inital publish message, which is altered in the main
-		
+
 		# creating a subscriber for the map
 		#self.map = None
 		#self.subscriber = rospy.Subscriber("map", OccupancyGrid, self.map_callback, queue_size=1)
@@ -46,7 +46,7 @@ class Target:
 		self.pointnum = 0
 		self.goalx = self.points[0][0]
 		self.goaly = self.points[0][1]
-		
+
 		self.is_lost = 0 #1 if the robot is lost from the target
 		self.done = 0 #1 if all the points have been traversed
 
@@ -56,13 +56,13 @@ class Target:
 		rospy.sleep(2)
 
 	def visibility_callback(self, msg):
-		# if lost, 
+		# if lost,
 		if msg.data==False:
 			self.is_lost=1
 		# if not lost
 		else:
-			self.is_lost=0    
-    
+			self.is_lost=0
+
 	# from Archita pa1, modified slightly
 	def odom_callback(self, odom_message):
 		# getting all of the odom information on the current pose of the robot
@@ -70,53 +70,53 @@ class Target:
 		self.posy = odom_message.pose.pose.position.y
 		# from https://answers.ros.org/question/11545/plotprint-rpy-from-quaternion/#17106
 		(roll, pitch, yaw) = tf.transformations.euler_from_quaternion([odom_message.pose.pose.orientation.x, odom_message.pose.pose.orientation.y, odom_message.pose.pose.orientation.z, odom_message.pose.pose.orientation.w])
-		self.angle = yaw	
-	
+		self.angle = yaw
+
 	# changing the message to simply rotate the robot
-	def rotate(self): 
+	def rotate(self):
 		self.rot_msg.angular.z = ANGVELOCITY
 		self.angzvel = ANGVELOCITY
-	
-    # changing the message to stop rotating the robot
-    def stop_rotate(self):
-        self.rot_msg.angular.z = 0
-        self.angzvel = 0
 
-    # changing the message to translate the robot
-    def translate(self):
-        self.trans_msg.linear.x = LINVELOCITY
-        self.linxvel = LINVELOCITY
+	# changing the message to stop rotating the robot
+	def stop_rotate(self):
+		self.rot_msg.angular.z = 0
+		self.angzvel = 0
 
-    # changing the message to stop translating the robot
-    def stop_translate(self):
-        self.trans_msg.linear.x = 0
-        self.linxvel = 0
+	# changing the message to translate the robot
+	def translate(self):
+		self.trans_msg.linear.x = LINVELOCITY
+		self.linxvel = LINVELOCITY
 
-    # checking if the goal angle is equal to the current angle and returning a boolean
-    def check_angle(self):
-        if -0.02 <= self.angle - self.goalangle <= 0.02:
-            return 1
-        else:
-            return 0
+	# changing the message to stop translating the robot
+	def stop_translate(self):
+		self.trans_msg.linear.x = 0
+		self.linxvel = 0
 
-    # verifying that the robot is at the correxct x 
-    def check_x(self):
-        if -0.08 <= self.posx - self.goalx <= 0.08:
-            return 1
-        else:
-            return 0
+	# checking if the goal angle is equal to the current angle and returning a boolean
+	def check_angle(self):
+		if -0.02 <= self.angle - self.goalangle <= 0.02:
+			return 1
+		else:
+			return 0
 
-    # verifying that the robot is at the correct y 
+	# verifying that the robot is at the correxct x
+	def check_x(self):
+		if -0.08 <= self.posx - self.goalx <= 0.08:
+			return 1
+		else:
+			return 0
+
+	# verifying that the robot is at the correct y
 	def check_y(self):
 		if -0.08 <= self.posy - self.goaly <= 0.08:
 			return 1
-		else: 
+		else:
 			return 0
 
 	 #updating which points are the goal points
 	def update_goal(self):
 
-		# test code to see if lost 
+		# test code to see if lost
 		#if self.pointnum==2:
 			#self.is_lost = 1
 
@@ -128,11 +128,11 @@ class Target:
 		if self.is_lost==1 and self.pointnum >= 2:
 			self.pointnum = self.pointnum-2
 
-		# if gone too much, finish 
+		# if gone too much, finish
 		if self.pointnum >= len(self.points):
 			self.done=1
 			return
-		
+
 		# using the next point's information as the goal
 		self.goalx = self.points[self.pointnum][0]
 		self.goaly = self.points[self.pointnum][1]
@@ -154,7 +154,7 @@ class Target:
 			xcheck = self.check_x()
 			ycheck = self.check_y()
 			# translate if not correct position
-			if xcheck==0 or ycheck==0: 
+			if xcheck==0 or ycheck==0:
 				self.stop_rotate()
 				self.pub.publish(self.rot_msg)
 				self.translate()
@@ -164,7 +164,7 @@ class Target:
 				self.pub.publish(self.trans_msg)
 				self.update_goal()
 
-	
+
 	def main(self):
 		# setup code
 
@@ -179,18 +179,18 @@ class Target:
 
 # class for the points on grid, copied from pa3 Archita
 class Node:
-    # initializing basic values of the node
-    def __init__(self, x, y, grid, goalx, goaly):
-        # self.value = grid.get_cell(x, y)
-        self.x = x
-        self.y = y
-        self.prev = None
+	# initializing basic values of the node
+	def __init__(self, x, y, grid, goalx, goaly):
+		# self.value = grid.get_cell(x, y)
+		self.x = x
+		self.y = y
+		self.prev = None
 
-    # setting the previous node
-    def set_prev(self, other_node):
-        self.prev = other_node
+	# setting the previous node
+	def set_prev(self, other_node):
+		self.prev = other_node
 
 
 if __name__ == "__main__":
-    t = Target()
-    t.main()
+	t = Target()
+	t.main()
