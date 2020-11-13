@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import rospy
 from geometry_msgs.msg import Twist
+import math
 #from identifier.py import Identifier # importing Identifier
 
 # PREDICTOR.PY 
@@ -16,31 +17,26 @@ class Predictor:
 		self.poses = []
 
 		# predicted target velocities
-		self.pred_linvel = None
-		self.pred_angvel = None
+		self.predx_vel = 0
+		self.predy_vel = 0
 
 	# given pose information from Identifier, updating instance variable for Predictors
-	def update_targetpos(self, posx, posy, linvel, angvel):
+	def update_targetpos(self, posx, posy, yaw, linvel, angvel):
 		# creating new instance of pose class
-		target = Pose(posx, posy, linvel, angvel)
+		target = Pose(posx, posy, yaw, linvel, angvel)
 		# adding new pose to the poses list
 		self.poses.append(target)
 
 	# given poses, return robot intended linear and angular velocity
-	def predict(self, list_poses): 
-		total_linvel=0
-		total_angvel=0
-		for pose in list_poses:
-			total_linvel += pose.get_linvel()
-			total_angvel += pose.get_angvel()
-		# treating each velocity with an equal probability, so taking average linear and angular velocity
-		self.pred_linvel = total_linvel/(len(list_poses))
-		self.pred_angvel = total_angvel/(len(list_poses))
-		print "Predicted velociy linear: \n" 
-		print self.pred_linvel 
-		print "\n Predicted vel angular: \n"
-		print self.pred_angvel
-	
+	def predict(self): 
+		last_obs = self.poses[-1]
+		angle = last_obs.get_yaw()
+		## https://docs.python.org/3/library/math.html
+		# using kalman filtering model, prediction is the last position + predicted changes in velocity
+		self.predx_vel = math.cos(angle)*last_obs.get_linvel()
+		self.predy_vel = math.sin(angle)*last_obs.get_linvel()
+		print self.predx_vel
+		print self.predy_vel
 
 	#def main(self):
 		#while not rospy.is_shutdown():
@@ -49,9 +45,10 @@ class Predictor:
 
 # mini class that has all the current information on target's whereabouts
 class Pose:
-	def __init__(self, positionx, positiony, linvelocity, angvelocity):
+	def __init__(self, positionx, positiony, theta, linvelocity, angvelocity):
 		self.posx = positionx
 		self.posy = positiony
+		self.yaw = theta # the angle around z axis
 		self.linvel = linvelocity
 		self.angvel = angvelocity
 
@@ -61,6 +58,9 @@ class Pose:
 
 	def get_posy(self):
 		return self.posy
+
+	def get_yaw(self):
+		return self.yaw
 
 	def get_linvel(self):
 		return self.linvel
