@@ -22,16 +22,13 @@ class Recovery:
 		# robot's current pose (pose at which we adopt recovery mode)
 		self.robot_pos = None
 
-		# output stats for later
+		# output stats for later?
 		self.elapsed_lost_time = 0
 
 		# full knowledge of world
 		self.world = world
 
-	def predict(self):
-		return self.brute_search()
-
-	def brute_search(self):
+	def recover(self):
 		# assume in map frame
 		self.end = [self.last_known_pos.x, self.last_known_pos.y]
 		self.start = [self.robot_pos.x, self.robot_pos.y]
