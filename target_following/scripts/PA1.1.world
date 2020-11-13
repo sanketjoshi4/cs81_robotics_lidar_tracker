@@ -1,0 +1,57 @@
+include "PA1.inc"
+
+define floorplan model
+(
+  # sombre, sensible, artistic
+  color "gray30"
+
+  # most maps will need a bounding box
+  boundary 1
+
+  gui_nose 0
+  gui_grid 0
+  gui_outline 0
+  gripper_return 0
+  fiducial_return 0
+  laser_return 1
+  #ranger_return 1
+)
+
+resolution 0.05
+interval_sim 10  # simulation timestep in milliseconds
+
+window
+(
+  size [ 624 665 ]
+  center [ 5.117 4.891 ]
+  rotate [ 0.000 0.000 ]
+  scale 61.159
+
+  #show_data 1
+)
+
+floorplan
+(
+  name "PA1"
+  bitmap "archipelago.png"
+  size [ 10.000 10.000 1.000 ]
+  pose [ 5.000 5.000 0.000 0.000 ]
+)
+
+# throw in a robot
+rosbot
+(
+  pose [ 3.000 5.000 0.000 0.000 ]
+  name "rosbot"
+  color "blue"
+)
+
+# and another one
+rosbot
+(
+  pose [ 4.005 5.000 0.000 0.000 ]
+  name "rosbot"
+  color "green"
+)
+
+
