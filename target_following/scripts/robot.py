@@ -120,13 +120,6 @@ class Robot:
         self.rcvr.robot_pos.x = p[0]
         self.rcvr.robot_pos.y = p[1]
 
-        # update recovery with target's last known pose
-        pos, vel = self.id.get_target_pos_vel(robot=self, frame="MAP")
-
-        self.rcvr.last_known_pos = Point()
-        self.rcvr.last_known_pos.x = pos[0]
-        self.rcvr.last_known_pos.y = pos[1]
-
     def display_target_status(self, tpos, tvel):
         if not self.target_ever_found:
             return
@@ -156,28 +149,25 @@ class Robot:
 
             # we detect target so decide how to move using PID-like function
             if tpos is not None and tvel is not None:
-                (lin_x, ang_z) = self.chase(tpos, tvel)
+                (lin_x, ang_z) = self.chase(tpos,tvel)
+
+                # recovery object will always have last known target pose to prepare for recovery mode
+                self.rcvr.last_known_pos = Point()
+                self.rcvr.last_known_pos.x = tpos[0]
+                self.rcvr.last_known_pos.y = tpos[1]
 
                 # clear poses for recovery when re-entering regular mode
                 if self.rcvr_poses:
                     self.rcvr_poses = []
 
             elif not self.target_ever_found:
-
-                # TODO : Can this be improved?
-                # The ID doesnt detect the target till the first few ticks
-                # The code jumps to recovery, with no last known position for target
-                # This gives an error
-                # Hence, Disabled recovery for the time being
-
-                # TODO : @Josephine Recovery is throwing an error, I've disabled it for the time being
-                # One reason might be that map_callback that instantiates rcvr is
-                # called sometime after the move function starts, resulting in nulpointer exception.
-                # I didn't get time to debug, maybe you could do that, apologies and thanks!
-                # I've added this workaround, currently, the code only handles chase
                 continue
 
-            elif self.rcvr is not None:  # target is out of sight, go into recovery mode
+            # elif self.rcvr is not None:  # target is out of sight, go into recovery mode
+            else:  # target is out of sight, go into recovery mode
+
+                print "In Recovery : {}".format(self.rcvr_poses)
+
                 if not self.rcvr_poses:
                     # we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
                     self.update_rcvr()  # remember to update Recovery object's required info first
@@ -267,7 +257,6 @@ class Robot:
         mat2 = np.matrix([[cz2, -sz2, 0, self.last_posx], [sz2, cz2, 0, self.last_posy], [0, 0, 1, 0], [0, 0, 0, 1]])
 
         return mat2.getI().dot(mat1)
-
 
 if __name__ == "__main__":
     # we'll probably set up target like this from main.py?
