@@ -30,9 +30,6 @@ BASE_ANGULAR_VELOCITY = PI / 2
 START_X_MAP = 3.0  # Would change as per the map
 START_Y_MAP = 5.0  # Would change as per the map
 
-REGULAR = 0
-RECOVER = 1
-
 # START_Z_MAP = 0.0
 
 class Robot:
@@ -59,8 +56,6 @@ class Robot:
             [[-1, 0, 1, START_X_MAP], [0, -1, 0, START_Y_MAP], [0, 0, 1, 0], [0, 0, 0, 1]])  # odom to map
         self.bTo = None  # odom to base_link
         self.world = None  # if we do not use world in here, delete this later
-
-	self.state = RECOVER # switch to REGULAR when hooking things up
 
 	self.rcvr_poses = []
 
@@ -153,29 +148,39 @@ class Robot:
 	vel_msg = Twist()
 
 	while not rospy.is_shutdown():
-		(lin_x, ang_z) = self.decide_move()
+		lin_x = 0
+		ang_z = 0
 
-		if self.state == RECOVER and not self.rcvr_poses:
-			self.update_rcvr()
-			self.rcvr_poses = self.rcvr.recover() # we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
+		# we detect target so decide how to move using PID-like function
+		if self.id.get_target_pos(frame="ODOM") is not None:
+			(lin_x, ang_z) = self.decide_move()
 
-		elif self.state != RECOVER:
-			self.rcvr_poses = []
+			# clear poses for recovery when re-entering regular mode
+			if self.rcvr_poses:
+				self.rcvr_poses = []
+		else: # target is out of sight, go into recovery mode
+			# just entering recovery mode from regular mode
+			if not self.rcvr_posesi:
+				# we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
+				self.update_rcvr() # remember to update Recovery object's required info first
+				self.rcvr_poses = self.rcvr.recover()
 
-		if self.state == RECOVER and self.rcvr_poses:
-			# essentially we are moving to every position from a list that goes [[goalx, goaly], ..., [startx, starty]], if we encounter
-			# target before we finish this list i.e. state changes back to REGULAR, just clear list to prep for next recovery call
-			pose = self.rcvr_poses.pop()
+			# in the middle of recovery mode
+			# separate if statement so we don't have to wait until next loop iteration to start moving once entered recovery mode
+			if self.rcvr_poses:
+				# essentially we are moving to every position from a list that goes [[goalx, goaly], ..., [startx, starty]], if we encounter
+				# target before we finish this list i.e. state changes back to REGULAR, just clear list to prep for next recovery call
+				pose = self.rcvr_poses.pop()
 
-			# transform user-given point in odom to base_link, assume ROBOT CAN'T FLY
-			self.get_transform()
-			v = np.linalg.inv(self.mTo).dot(np.transpose(np.array([pose[0], pose[1], 0, 1])))
-			v = self.bTo.dot(v)
-			v = v[0:2]  # only need x,y because of assumption above
-			# angle to turn i.e. angle btwn x-axis vector and vector of x,y above
-			ang_z = np.arctan2(v[1], v[0])
-			# euclidean distance to travel, assume no movement in z-axis
-			lin_x = np.linalg.norm(np.array([0, 0]) - v)
+				# transform user-given point in odom to base_link, assume ROBOT CAN'T FLY
+				self.get_transform()
+				v = np.linalg.inv(self.mTo).dot(np.transpose(np.array([pose[0], pose[1], 0, 1])))
+				v = self.bTo.dot(v)
+				v = v[0:2]  # only need x,y because of assumption above
+				# angle to turn i.e. angle btwn x-axis vector and vector of x,y above
+				ang_z = np.arctan2(v[1], v[0])
+				# euclidean distance to travel, assume no movement in z-axis
+				lin_x = np.linalg.norm(np.array([0, 0]) - v)
 		
 		vel_msg.linear.x = lin_x
 		vel_msg.angular.z = ang_z
