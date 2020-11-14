@@ -85,14 +85,11 @@ class Recovery:
 
 			# we've found goal, back trace and return
 			if curr == goal:
-				print("found")
 				path = []
 				while curr in closed_set:
 					path.append(curr)
 					curr = closed_set[curr]
-				#path.append(curr)
-				path.reverse()
-				return path # [start, a, b, c, ..., goal]
+				return path # [goal, ..., c, b, a] reversed so we can pop() later
 
 			# look at all neighbors in y dir
 			cx = curr.coords[0]

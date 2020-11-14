@@ -16,7 +16,7 @@ from std_msgs.msg import Bool
 from sensor_msgs.msg import LaserScan
 
 FREQ = 10  # Hz
-SLEEP = 2
+SLEEP = 2 # secs
 VEL = 0.1  # m/s
 
 SCAN_FREQ = 1  # Hz
@@ -30,6 +30,8 @@ BASE_ANGULAR_VELOCITY = PI / 2
 START_X_MAP = 3.0  # Would change as per the map
 START_Y_MAP = 5.0  # Would change as per the map
 
+REGULAR = 0
+RECOVER = 1
 
 # START_Z_MAP = 0.0
 
@@ -57,6 +59,10 @@ class Robot:
             [[-1, 0, 1, START_X_MAP], [0, -1, 0, START_Y_MAP], [0, 0, 1, 0], [0, 0, 0, 1]])  # odom to map
         self.bTo = None  # odom to base_link
         self.world = None  # if we do not use world in here, delete this later
+
+	self.state = RECOVER # switch to REGULAR when hooking things up
+
+	self.rcvr_poses = []
 
         self.lis = tf.TransformListener()
         self.rcvr = None
@@ -126,10 +132,56 @@ class Robot:
             else:
                 print "TARGET: Not found"
 
+    def update_rcvr(self):
+	# update recovery with robot's current pose
+	self.get_transform() # update self.bTo first
+	p = np.linalg.inv(self.bTo).dot(np.transpose(np.array([0, 0, 0, 1])))
+        p = self.mTo.dot(p)[0:2]
+	self.rcvr.robot_pos = Point()
+        self.rcvr.robot_pos.x = p[0]
+        self.rcvr.robot_pos.y = p[1]
+
+	# update recovery with target's last known pose
+	px, py = self.id.get_target_pos(frame="MAP")
+	self.rcvr.last_known_pos = Point()
+	self.rcvr.last_known_pos.x = px
+	self.rcvr.last_known_pos.y = py
+
+
     def move(self):
-        # TODO: add actual logic to this function
-        # TODO: get predicted x and z velocities from Predictor, combine with Identifier info to calculate move
-        pass
+	rate = rospy.Rate(FREQ)
+	vel_msg = Twist()
+
+	while not rospy.is_shutdown():
+		(lin_x, ang_z) = self.decide_move()
+
+		if self.state == RECOVER and not self.rcvr_poses:
+			self.update_rcvr()
+			self.rcvr_poses = self.rcvr.recover() # we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
+
+		elif self.state != RECOVER:
+			self.rcvr_poses = []
+
+		if self.state == RECOVER and self.rcvr_poses:
+			# essentially we are moving to every position from a list that goes [[goalx, goaly], ..., [startx, starty]], if we encounter
+			# target before we finish this list i.e. state changes back to REGULAR, just clear list to prep for next recovery call
+			pose = self.rcvr_poses.pop()
+
+			# transform user-given point in odom to base_link, assume ROBOT CAN'T FLY
+			self.get_transform()
+			v = np.linalg.inv(self.mTo).dot(np.transpose(np.array([pose[0], pose[1], 0, 1])))
+			v = self.bTo.dot(v)
+			v = v[0:2]  # only need x,y because of assumption above
+			# angle to turn i.e. angle btwn x-axis vector and vector of x,y above
+			ang_z = np.arctan2(v[1], v[0])
+			# euclidean distance to travel, assume no movement in z-axis
+			lin_x = np.linalg.norm(np.array([0, 0]) - v)
+		
+		vel_msg.linear.x = lin_x
+		vel_msg.angular.z = ang_z
+		self.pub.publish(vel_msg)
+		rate.sleep()
+
 
     def get_movement_transform(self):
 
@@ -238,4 +290,4 @@ class Robot:
 if __name__ == "__main__":
     # we'll probably set up target like this from main.py?
     r = Robot()
-    r.simple_main()
+    r.move()
