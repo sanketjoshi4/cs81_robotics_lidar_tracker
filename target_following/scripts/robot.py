@@ -136,12 +136,6 @@ class Robot:
         self.rcvr.robot_pos.x = p[0]
         self.rcvr.robot_pos.y = p[1]
 
-	# update recovery with target's last known pose
-	px, py = self.id.get_target_pos(frame="MAP")
-	self.rcvr.last_known_pos = Point()
-	self.rcvr.last_known_pos.x = px
-	self.rcvr.last_known_pos.y = py
-
 
     def move(self):
 	rate = rospy.Rate(FREQ)
@@ -153,7 +147,13 @@ class Robot:
 
 		# we detect target so decide how to move using PID-like function
 		if self.id.get_target_pos(frame="ODOM") is not None:
-			(lin_x, ang_z) = self.decide_move()
+			(lin_x, ang_z) = self.chase_target()
+
+			# recovery object will always have last known target pose to prepare for recovery mode
+			target_x, target_y = self.id.get_target_pos(frame="MAP")
+			self.rcvr.last_known_pos = Point()
+			self.rcvr.last_known_pos.x = target_x
+			self.rcvr.last_known_pos.y = target_y
 
 			# clear poses for recovery when re-entering regular mode
 			if self.rcvr_poses:
@@ -239,57 +239,6 @@ class Robot:
         # print "MAP  : {}".format(follower_utils.show_pos(pos_map))
 
         return None
-
-    def main(self):
-        print("in main")
-        while self.rcvr is None:
-            continue
-        self.rcvr.robot_pos = Point()
-        p = self.mTo.dot(np.transpose(np.array([0, 0, 0, 1])))[0:2]
-        self.rcvr.robot_pos.x = p[0]
-        self.rcvr.robot_pos.y = p[1]
-        print(p)
-        print('---')
-        print(self.posx, self.posy, self.angle)
-        vel_msg = Twist()
-        rate = rospy.Rate(FREQ)
-        poses = self.rcvr.predict()  # expect [[x,y],[x,y],...]
-        print(poses)
-        for pose in poses:
-            # transform user-given point in odom to base_link, assume ROBOT CAN'T FLY
-            self.get_transform()
-            v = np.linalg.inv(self.mTo).dot(np.transpose(np.array([pose[0], pose[1], 0, 1])))
-            v = self.bTo.dot(v)
-            v = v[0:2]  # only need x,y because of assumption above
-            print(v)
-            # angle to turn i.e. angle btwn x-axis vector and vector of x,y above
-            a = np.arctan2(v[1], v[0])
-            # euclidean distance to travel, assume no movement in z-axis
-            l = np.linalg.norm(np.array([0, 0]) - v)
-            start_time = rospy.get_rostime()
-            if a >= 0:  # anticlockwise rot (or no rot)
-                start_time = rospy.get_rostime()
-                while not rospy.is_shutdown() and rospy.get_rostime() - start_time < rospy.Duration(a / VEL):
-                    vel_msg.angular.z = VEL
-                    vel_msg.linear.x = 0
-                    self.pub.publish(vel_msg)
-                    rate.sleep()
-            else:
-                start_time = rospy.get_rostime()
-                while not rospy.is_shutdown() and rospy.get_rostime() - start_time < rospy.Duration(-a / VEL):
-                    vel_msg.angular.z = -VEL
-                    vel_msg.linear.x = 0
-                    self.pub.publish(vel_msg)
-                    rate.sleep()
-            start_time = rospy.get_rostime()
-            while not rospy.is_shutdown() and rospy.get_rostime() - start_time < rospy.Duration(l / VEL):
-                vel_msg.angular.z = 0
-                vel_msg.linear.x = VEL
-                self.pub.publish(vel_msg)
-                rate.sleep()
-        print(self.posx, self.posy, self.angle)
-        self.pub_visibility(True)
-        self.pub_visibility(False)
 
 
 if __name__ == "__main__":
