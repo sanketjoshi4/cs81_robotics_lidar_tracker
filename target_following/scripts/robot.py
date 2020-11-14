@@ -20,18 +20,13 @@ SLEEP = 2
 VEL = 0.1  # m/s
 
 SCAN_FREQ = 1  # Hz
-
 PI = np.pi
-LASER_RANGE = 20.0
 
-BASE_LINEAR_VELOCITY = 1.0
-BASE_ANGULAR_VELOCITY = PI / 2
-
+# TODO : Figure out a better way to code robot's start pose .. env vars?
 START_X_MAP = 3.0  # Would change as per the map
 START_Y_MAP = 5.0  # Would change as per the map
+START_Z_MAP = 0.0
 
-
-# START_Z_MAP = 0.0
 
 class Robot:
 
@@ -103,32 +98,37 @@ class Robot:
         print(self.map.T)
 
     def laser_scan_callback(self, laser_scan_msg):
+        """ Uses laser scan to update target position """
 
         curr_time = rospy.get_time()
         if self.time_last_scan is None or (curr_time - self.time_last_scan > 1 / SCAN_FREQ):
-            print "{}".format(''.join(['-' for _ in range(100)]))
+            # Scan based on SCAN_FREQ
+            # print "{}".format(''.join(['-' for _ in range(100)]))
 
-            # print "Pose: ({}, {}, {})".format(show(self.posx), show(self.posy), show(self.angle))
-            # print "LPos: ({}, {}, {})".format(show(self.last_posx), show(self.last_posy), show(self.last_angle))
             if self.posx is not None and self.last_posx is not None:
+                # Identify blobs
                 self.id.blobify(laser_scan_msg)
+                # Classify blobs, set target
                 self.id.classify(self.get_movement_transform())
 
+            # Update last pose to current
             self.last_posx = self.posx
             self.last_posy = self.posy
             self.last_angle = self.angle
             self.time_last_scan = curr_time
 
-            target_pos = self.get_target_pos(frame="ODOM")
-            # print "Robot  @ ({}, {})".format(show(self.posx), show(self.posy))
+            # TODO : Remove, debug only
+            target_pos = self.id.get_target_pos(robot_posx=self.posx, robot_posy=self.posy, robot_angle=self.angle,
+                                                trans_odom_to_map=self.mTo, frame="ODOM")
             if target_pos is not None:
                 print "Target @ ({},{})".format(follower_utils.show(target_pos[0]), follower_utils.show(target_pos[1]))
             else:
-                print "TARGET: Not found"
+                print "TARGET @ ???"
 
     def move(self):
         # TODO: add actual logic to this function
         # TODO: get predicted x and z velocities from Predictor, combine with Identifier info to calculate move
+
         pass
 
     def get_movement_transform(self):
@@ -143,8 +143,9 @@ class Robot:
 
         return mat2.getI().dot(mat1)
 
-    def simple_main(self):
-        print(self.posx, self.posy, self.angle)
+    def id_test(self):
+        """ A simple test to check if target is identified, robot moves in straight line """
+
         vel_msg = Twist()
         rate = rospy.Rate(FREQ)
         start_time = rospy.get_rostime()
@@ -154,34 +155,6 @@ class Robot:
             vel_msg.linear.x = VEL
             self.pub.publish(vel_msg)
             rate.sleep()
-
-    def get_target_pos(self, frame):
-
-        if self.id.target is None:
-            return None
-
-        sz, cz = np.sin(self.angle), np.cos(self.angle)
-
-        x_base_scan, y_base_scan = self.id.target.mean[0], self.id.target.mean[1]
-        pos_base_scan = np.array([[x_base_scan], [y_base_scan], [0], [1]])
-        if frame == "BASE":
-            return float(pos_base_scan[0][0]), float(pos_base_scan[1][0])
-        # print "BASE : {}".format(follower_utils.show_pos(pos_base_scan))
-
-        trans_base_scan_to_odom = np.matrix(
-            [[cz, -sz, 0, self.posx], [sz, cz, 0, self.posy], [0, 0, 1, 0], [0, 0, 0, 1]])
-        pos_odom = trans_base_scan_to_odom.dot(pos_base_scan)
-        if frame == "ODOM":
-            return float(pos_odom[0][0]), float(pos_odom[1][0])
-        # print "ODOM : {}".format(follower_utils.show_pos(pos_odom))
-
-        trans_odom_to_map = self.mTo
-        pos_map = trans_odom_to_map.dot(pos_odom)
-        if frame == "MAP":
-            return float(pos_map[0][0]), float(pos_map[1][0])
-        # print "MAP  : {}".format(follower_utils.show_pos(pos_map))
-
-        return None
 
     def main(self):
         print("in main")
@@ -238,4 +211,4 @@ class Robot:
 if __name__ == "__main__":
     # we'll probably set up target like this from main.py?
     r = Robot()
-    r.simple_main()
+    r.id_test()
