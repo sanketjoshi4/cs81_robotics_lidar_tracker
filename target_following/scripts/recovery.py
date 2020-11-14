@@ -28,6 +28,8 @@ class Recovery:
 		# full knowledge of world
 		self.world = world
 
+		print("init done")
+
 	def recover(self):
 		"""
 		Returns a list of poses in map frame that robot needs to be in, in order to move to last_known_pos
@@ -36,6 +38,7 @@ class Recovery:
 		# assume in map frame
 		self.end = [self.last_known_pos.x, self.last_known_pos.y]
 		self.start = [self.robot_pos.x, self.robot_pos.y]
+		print("finding path from ", self.start, "to ", self.end)
 
 		# convert from map to grid; theta doesn't matter here
 		start_grid_x, start_grid_y, theta = self.world.map_to_grid(self.start[0], self.start[1], 0)

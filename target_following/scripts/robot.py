@@ -15,7 +15,7 @@ from nav_msgs.msg import OccupancyGrid, Odometry
 from std_msgs.msg import Bool
 from sensor_msgs.msg import LaserScan
 
-CMD_FREQ = 1  # Hz
+CMD_FREQ = 10  # Hz
 SLEEP = 2  # secs
 VEL = 0.1  # m/s
 
@@ -91,7 +91,6 @@ class Robot:
         print("loading map")
         self.map = World(msg.data, msg.info.width, msg.info.height, msg.info.resolution, msg.header.frame_id,
                          msg.info.origin)
-        self.rcvr = Recovery(self.map)
         print(self.map.T)
 
     def laser_scan_callback(self, laser_scan_msg):
@@ -114,8 +113,7 @@ class Robot:
     def update_rcvr(self):
         # update recovery with robot's current pose
         self.get_transform()  # update self.bTo first
-        p = np.linalg.inv(self.bTo).dot(np.transpose(np.array([0, 0, 0, 1])))
-        p = self.mTo.dot(p)[0:2]
+        p = self.mTo.dot(np.transpose(np.array([self.posx, self.posy, 0, 1])))[0:2]
         self.rcvr.robot_pos = Point()
         self.rcvr.robot_pos.x = p[0]
         self.rcvr.robot_pos.y = p[1]
@@ -135,6 +133,8 @@ class Robot:
             print "Target Lost"
 
     def move(self):
+        self.rcvr = Recovery(self.map)
+
         rate = rospy.Rate(CMD_FREQ)
         vel_msg = Twist()
         print "Searching for target..."
@@ -152,9 +152,10 @@ class Robot:
                 (lin_x, ang_z) = self.chase(tpos,tvel)
 
                 # recovery object will always have last known target pose to prepare for recovery mode
+		tpos_map, tvel_map = self.id.get_target_pos_vel(robot=self, frame="MAP")
                 self.rcvr.last_known_pos = Point()
-                self.rcvr.last_known_pos.x = tpos[0]
-                self.rcvr.last_known_pos.y = tpos[1]
+                self.rcvr.last_known_pos.x = tpos_map[0]
+                self.rcvr.last_known_pos.y = tpos_map[1]
 
                 # clear poses for recovery when re-entering regular mode
                 if self.rcvr_poses:
@@ -172,23 +173,40 @@ class Robot:
                     # we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
                     self.update_rcvr()  # remember to update Recovery object's required info first
                     self.rcvr_poses = self.rcvr.recover()
+		    print("retrieved rcvr_poses", self.rcvr_poses)
 
                 # in the middle of recovery mode
                 # separate if statement so we don't have to wait until next loop iteration to start moving once entered recovery mode
                 if self.rcvr_poses:
                     # essentially we are moving to every position from a list that goes [[goalx, goaly], ..., [startx, starty]], if we encounter
                     # target before we finish this list i.e. state changes back to REGULAR, just clear list to prep for next recovery call
-                    pose = self.rcvr_poses.pop()
+                    pose = self.rcvr_poses[-1]
 
                     # transform user-given point in odom to base_link, assume ROBOT CAN'T FLY
                     self.get_transform()
                     v = np.linalg.inv(self.mTo).dot(np.transpose(np.array([pose[0], pose[1], 0, 1])))
                     v = self.bTo.dot(v)
                     v = v[0:2]  # only need x,y because of assumption above
-                    # angle to turn i.e. angle btwn x-axis vector and vector of x,y above
-                    ang_z = np.arctan2(v[1], v[0])
-                    # euclidean distance to travel, assume no movement in z-axis
-                    lin_x = np.linalg.norm(np.array([0, 0]) - v)
+                    # remaining angle to turn i.e. angle btwn x-axis vector and vector of x,y above
+                    ang = np.arctan2(v[1], v[0])
+                    if -0.025 <= ang <= 0.025:
+                        # turn finished so start moving in lin x only, if applicable
+			ang_z = 0
+                    	# remaining euclidean distance to travel, assume no movement in z-axis
+                    	dis = np.linalg.norm(np.array([0, 0]) - v)
+			if -0.025 <= dis <= 0.025:
+			    # lin x move finished, pop this pose
+			    self.rcvr_poses.pop()
+			    continue # no need to waste a publication
+                        else:
+                            lin_x = VEL # rotation ensures we always move forward
+                    else:
+                        lin_x = 0
+			if ang < 0:
+			    ang_z = -VEL
+			else: # can only be positive, near 0 is rounded to 0 and handled above
+			    ang_z = VEL
+                    
 
             vel_msg.linear.x = lin_x
             vel_msg.angular.z = ang_z
