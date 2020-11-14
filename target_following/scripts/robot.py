@@ -57,7 +57,7 @@ class Robot:
         self.bTo = None  # odom to base_link
         self.world = None  # if we do not use world in here, delete this later
 
-	self.rcvr_poses = []
+	self.rcvr_poses = [] # all poses to move to in order to get to last detected target pose
 
         self.lis = tf.TransformListener()
         self.rcvr = None
@@ -160,7 +160,7 @@ class Robot:
 				self.rcvr_poses = []
 		else: # target is out of sight, go into recovery mode
 			# just entering recovery mode from regular mode
-			if not self.rcvr_posesi:
+			if not self.rcvr_poses:
 				# we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
 				self.update_rcvr() # remember to update Recovery object's required info first
 				self.rcvr_poses = self.rcvr.recover()
