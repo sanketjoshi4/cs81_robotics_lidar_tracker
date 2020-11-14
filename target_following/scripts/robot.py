@@ -120,7 +120,8 @@ class Robot:
             self.last_angle = self.angle
             self.time_last_scan = curr_time
 
-            target_pos = self.get_target_pos(frame="ODOM")
+            target_pos = self.get_target_pos(robot_posx=self.posx, robot_posy=self.posy, robot_angle=self.angle,
+                                                trans_odom_to_map=self.mTo, frame="ODOM")
             # print "Robot  @ ({}, {})".format(show(self.posx), show(self.posy))
             if target_pos is not None:
                 print "Target @ ({},{})".format(follower_utils.show(target_pos[0]), follower_utils.show(target_pos[1]))
@@ -146,11 +147,13 @@ class Robot:
 		ang_z = 0
 
 		# we detect target so decide how to move using PID-like function
-		if self.id.get_target_pos(frame="ODOM") is not None:
+		if self.id.get_target_pos(robot_posx=self.posx, robot_posy=self.posy, robot_angle=self.angle,
+                                                trans_odom_to_map=self.mTo, frame="ODOM") is not None:
 			(lin_x, ang_z) = self.chase_target()
 
 			# recovery object will always have last known target pose to prepare for recovery mode
-			target_x, target_y = self.id.get_target_pos(frame="MAP")
+			target_x, target_y = self.id.get_target_pos(robot_posx=self.posx, robot_posy=self.posy, robot_angle=self.angle,
+                                                trans_odom_to_map=self.mTo, frame="MAP")
 			self.rcvr.last_known_pos = Point()
 			self.rcvr.last_known_pos.x = target_x
 			self.rcvr.last_known_pos.y = target_y
