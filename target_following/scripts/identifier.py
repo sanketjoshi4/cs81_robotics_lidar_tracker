@@ -9,6 +9,9 @@ import follower_utils
 class Identifier:
     """ Rsponsible for using laser scan data to identify obstacles and moving entities """
 
+    SCAN_FREQ = 1.0  # Hz
+    ID_INIT_TIME = 3.0 # seconds before ID first detects the target
+
     # The minimum change in laser reading between adjacent angles, to consider them to be coming from different objects
     THRESH_RADIALLY_SEPARATE = 0.5
 
@@ -78,9 +81,6 @@ class Identifier:
         for blob_id, blob in self.blobs.items():
             blob.calculate_mean()
 
-        # Print blobs
-        # print [b.show() for b in self.blobs.values()]
-
     def classify(self, movement_transform):
         """ This is responsible for separating moving blobs from static ones. Saves the blob in motion as the target """
 
@@ -90,11 +90,6 @@ class Identifier:
         obs = []
         target = None
         shift_min_target = 100
-
-        # print "\nBLOBS"
-        # print [b.show() for b in self.blobs.values()]
-        # print "\nLAST_BLOBS"
-        # print [b.show() for b in self.last_blobs.values()]
 
         for last_blob_id, last_blob in self.last_blobs.items():
             # For every blob in last scan
@@ -128,17 +123,11 @@ class Identifier:
         # Save last blobs and target
         self.last_obs = copy.deepcopy(self.obs)
         self.last_target = copy.deepcopy(self.target)  # in base_scan ref
-        self.last_target_vel = copy.deepcopy(self.target_vel)  # in base_scan ref
+        # self.last_target_vel = copy.deepcopy(self.target_vel)  # in base_scan ref
 
         # Update blobs and target
         self.obs = obs
-        self.target = target  # in base_scan ref
-        if self.target is not None and self.last_target is not None:
-            dx = self.target.mean[0] - self.last_target.mean[0]
-            dy = self.target.mean[1] - self.last_target.mean[1]
-            self.target_vel = (dx, dy)
-        else:
-            self.target_vel = None
+        self.target = target.mean if target is not None else None  # in base_scan ref
 
     def status(self):
         """ This returns the FSM state given the target location w.r.t. robot """
@@ -155,33 +144,56 @@ class Identifier:
             return Identifier.STATUS_FAR
         return Identifier.STATUS_OOR
 
-    def get_target_pos(self, robot_posx, robot_posy, robot_angle, trans_odom_to_map, frame):
-        """ This returns the target position if identified, in the specified frame of reference """
-
-        if self.target is None:
+    @staticmethod
+    def get_pos(target, robot_x, robot_y, robot_angle, trans_odom_to_map, frame):
+        if target is None:
             return None
 
-        sz, cz = np.sin(robot_angle), np.cos(robot_angle)
-
-        x_base_scan, y_base_scan = self.target.mean[0], self.target.mean[1]
-        pos_base_scan = np.array([[x_base_scan], [y_base_scan], [0], [1]])
         if frame == "BASE":
-            return float(pos_base_scan[0][0]), float(pos_base_scan[1][0])
-        # print "BASE : {}".format(follower_utils.show_pos(pos_base_scan))
+            return target
 
-        trans_base_scan_to_odom = np.matrix(
-            [[cz, -sz, 0, robot_posx], [sz, cz, 0, robot_posy], [0, 0, 1, 0], [0, 0, 0, 1]])
-        pos_odom = trans_base_scan_to_odom.dot(pos_base_scan)
+        # BASE to ODOM
+        sz, cz = np.sin(robot_angle), np.cos(robot_angle)
+        pos_odom = np.matrix(
+            [[cz, -sz, 0, robot_x], [sz, cz, 0, robot_y], [0, 0, 1, 0], [0, 0, 0, 1]]
+        ).dot(np.array([[target[0]], [target[1]], [0], [1]]))
+
         if frame == "ODOM":
             return float(pos_odom[0][0]), float(pos_odom[1][0])
-        # print "ODOM : {}".format(follower_utils.show_pos(pos_odom))
 
         pos_map = trans_odom_to_map.dot(pos_odom)
         if frame == "MAP":
             return float(pos_map[0][0]), float(pos_map[1][0])
-        # print "MAP  : {}".format(follower_utils.show_pos(pos_map))
 
         return None
+
+    def get_target_pos_vel(self, robot, frame):
+        """ This returns the target position and velocity if identified, in the specified frame of reference """
+
+        if self.target is None:
+            return None, None
+
+        target_pos = Identifier.get_pos(
+            target=self.target,
+            robot_x=robot.posx, robot_y=robot.posy, robot_angle=robot.angle,
+            trans_odom_to_map=robot.mTo, frame=frame
+        )
+
+        last_target_pos = Identifier.get_pos(
+            target=self.last_target,
+            robot_x=robot.last_posx, robot_y=robot.last_posy, robot_angle=robot.last_angle,
+            trans_odom_to_map=robot.mTo, frame=frame
+        )
+
+        if self.last_target is None:
+            return target_pos, None
+
+        target_vel = (
+            (target_pos[0] - last_target_pos[0]) * Identifier.SCAN_FREQ,
+            (target_pos[1] - last_target_pos[1]) * Identifier.SCAN_FREQ
+        )
+
+        return target_pos, target_vel
 
 
 class Blob:

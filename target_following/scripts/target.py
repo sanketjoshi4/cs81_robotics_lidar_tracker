@@ -113,7 +113,7 @@ class Target:
 		else:
 			return 0
 
-	 #updating which points are the goal points
+	# updating which points are the goal points
 	def update_goal(self):
 
 		# test code to see if lost
@@ -176,6 +176,19 @@ class Target:
 			#self.predictor.update_targetpos(self.posx, self.posy, self.linxvel, self.angzvel)
 			#self.predictor.predict(self.predictor.poses)
 
+	def simple_main(self):
+		""" A simple test to check if target is identified, robot moves in straight line """
+
+		vel_msg = Twist()
+		rate = rospy.Rate(FREQ)
+		start_time = rospy.get_rostime()
+
+		while not rospy.is_shutdown() and rospy.get_rostime() - start_time < rospy.Duration(100):
+			vel_msg.angular.z = 0
+			vel_msg.linear.x = VEL
+			self.pub.publish(vel_msg)
+			rate.sleep()
+
 
 # class for the points on grid, copied from pa3 Archita
 class Node:
@@ -193,4 +206,4 @@ class Node:
 
 if __name__ == "__main__":
 	t = Target()
-	t.main()
+	t.simple_main()
