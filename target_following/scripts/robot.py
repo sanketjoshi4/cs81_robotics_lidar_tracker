@@ -155,7 +155,7 @@ class Robot:
             self.display_target_status(tpos, tvel)
 
             # we detect target so decide how to move using PID-like function
-            if tpos is not None:
+            if tpos is not None and tvel is not None:
                 (lin_x, ang_z) = self.chase(tpos, tvel)
 
                 # clear poses for recovery when re-entering regular mode
@@ -163,15 +163,21 @@ class Robot:
                     self.rcvr_poses = []
 
             elif not self.target_ever_found:
+
                 # TODO : Can this be improved?
                 # The ID doesnt detect the target till the first few ticks
                 # The code jumps to recovery, with no last known position for target
                 # This gives an error
                 # Hence, Disabled recovery for the time being
+
+                # TODO : @Josephine Recovery is throwing an error, I've disabled it for the time being
+                # One reason might be that map_callback that instantiates rcvr is
+                # called sometime after the move function starts, resulting in nulpointer exception.
+                # I didn't get time to debug, maybe you could do that, apologies and thanks!
+                # I've added this workaround, currently, the code only handles chase
                 continue
 
-            else:  # target is out of sight, go into recovery mode
-                # just entering recovery mode from regular mode
+            elif self.rcvr is not None:  # target is out of sight, go into recovery mode
                 if not self.rcvr_poses:
                     # we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
                     self.update_rcvr()  # remember to update Recovery object's required info first
@@ -200,8 +206,34 @@ class Robot:
             rate.sleep()
 
     def chase(self, tpos, tvel):
+
+        lin_x = 0.1
+
+        rpx = self.posx  # robot pos x
+        rpy = self.posy  # robot pos y
+        rpz = self.angle  # robot angle
+
+        rvx = (self.posx - self.last_posx) * Identifier.SCAN_FREQ  # robot vel x
+        rvy = (self.posy - self.last_posy) * Identifier.SCAN_FREQ  # robot vel y
+        rvz = (self.angle - self.last_angle) * Identifier.SCAN_FREQ  # robot ang vel
+
+        tpx = tpos[0]  # target pos x
+        tpy = tpos[1]  # target pos y
+
+        tvx = tvel[0]  # target vel x
+        tvy = tvel[1]  # target vel y
+
+        obs = self.id.obs
+        print "RP:{},{},{}".format(follower_utils.show(rpx), follower_utils.show(rpy), follower_utils.show(rpz))
+        print "RV:{},{},{}".format(follower_utils.show(rvx), follower_utils.show(rvy), follower_utils.show(rvz))
+        print "TP:{},{}".format(follower_utils.show(tpx), follower_utils.show(tpy))
+        print "TV:{},{}".format(follower_utils.show(tvx), follower_utils.show(tvy))
+
+        print "BaseTY:", self.id.target[1]
+        ang_z = self.id.target[1] if self.id.target is not None else 0
+
         """
-        decide_move :: (rp, rv, tp, tv, obs) -> angle
+        chase :: (rp, rv, tp, tv, obs) -> angle
             speed,  angle_of_pid <- pid_like(rp, rv, tp, tv)
             if obs @ angle_of_pid:
                 angle_left <- search left
@@ -221,8 +253,7 @@ class Robot:
             wiggle_angle <- angle_btwn(rv,tv)
             return wiggle angle
         """
-        lin_x = 0.1
-        ang_z = 0
+
         return lin_x, ang_z
 
     def get_movement_transform(self):
