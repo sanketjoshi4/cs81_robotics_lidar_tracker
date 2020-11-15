@@ -9,7 +9,7 @@ import follower_utils
 class Identifier:
     """ Rsponsible for using laser scan data to identify obstacles and moving entities """
 
-    SCAN_FREQ = 1.0  # Hz
+    SCAN_FREQ = 3.0  # Hz
     ID_INIT_TIME = 3.0  # seconds before ID first detects the target
 
     # The minimum change in laser reading between adjacent angles, to consider them to be coming from different objects
@@ -81,7 +81,7 @@ class Identifier:
         for blob_id, blob in self.blobs.items():
             blob.calculate_mean()
 
-        print [b.show() for _, b in self.blobs.items()]
+        # print [b.show() for _, b in self.blobs.items()]
 
     def classify(self, movement_transform):
         """ This is responsible for separating moving blobs from static ones. Saves the blob in motion as the target """
@@ -110,16 +110,16 @@ class Identifier:
                 shift = float(np.sqrt(dx * dx + dy * dy))
 
                 if shift < Identifier.THRESH_BLOB_STATIC:
-                    print "STATIC:{},{}".format(blob_id, last_blob_id)
+                    # print "STATIC:{},{}".format(blob_id, last_blob_id)
                     # Below static threshold, so static blob
                     obs.append(blob)
                     continue
 
                 elif shift < Identifier.THRESH_BLOB_MOVEMENT:
-                    print "MOVING:{},{}".format(blob_id, last_blob_id)
+                    # print "MOVING:{},{}".format(blob_id, last_blob_id)
                     # Below moving threshold, so static blob
                     if shift < shift_min_target:
-                        print "TARGET:{},{}".format(blob_id, last_blob_id)
+                        # print "TARGET:{},{}".format(blob_id, last_blob_id)
                         target = blob
                         shift_min_target = shift
 
