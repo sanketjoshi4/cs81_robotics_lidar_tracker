@@ -9,7 +9,7 @@ import follower_utils
 class Identifier:
     """ Rsponsible for using laser scan data to identify obstacles and moving entities """
 
-    SCAN_FREQ = 3.0  # Hz
+    SCAN_FREQ = 1  # Hz
     ID_INIT_TIME = 3.0  # seconds before ID first detects the target
 
     # The minimum change in laser reading between adjacent angles, to consider them to be coming from different objects
@@ -23,6 +23,8 @@ class Identifier:
     # Hence, we compare with all blobs in the last scan and the ones that have a large difference are probably
     # Different blobs and the ones with a small distance, but greater than THRESH_BLOB_STATIC, are moving blobs
     THRESH_BLOB_MOVEMENT = 1.5
+
+    THRESH_TARGET_SIZE = 0.25
 
     # Below are the statuses based on distance from target
     STATUS_CLOSE = 1
@@ -79,7 +81,7 @@ class Identifier:
 
         # Calculate blob means
         for blob_id, blob in self.blobs.items():
-            blob.calculate_mean()
+            blob.calculate_mean_and_size(incr)
 
         # print [b.show() for _, b in self.blobs.items()]
 
@@ -110,16 +112,17 @@ class Identifier:
                 shift = float(np.sqrt(dx * dx + dy * dy))
 
                 if shift < Identifier.THRESH_BLOB_STATIC:
-                    # print "STATIC:{},{}".format(blob_id, last_blob_id)
+                    print "STATIC:{},{}".format(blob_id, last_blob_id)
                     # Below static threshold, so static blob
                     obs.append(blob)
                     continue
 
                 elif shift < Identifier.THRESH_BLOB_MOVEMENT:
-                    # print "MOVING:{},{}".format(blob_id, last_blob_id)
+                    print "MOVING:{},{}".format(blob_id, last_blob_id)
                     # Below moving threshold, so static blob
-                    if shift < shift_min_target:
-                        # print "TARGET:{},{}".format(blob_id, last_blob_id)
+                    if blob.size < Identifier.THRESH_TARGET_SIZE:
+                        # if shift < shift_min_target:
+                        print "TARGET:{},{}".format(blob_id, last_blob_id)
                         target = blob
                         shift_min_target = shift
 
@@ -208,16 +211,18 @@ class Blob:
         self.id = id
         self.arr = None  # [coordinates of incident laser rays in bot frame]
         self.mean = None  # [mean coordinate in bot frame]
+        self.size = None  # [mean coordinate in bot frame]
 
     def add_point(self, point):
         if self.arr is None:
             self.arr = []
         self.arr.append(point)
 
-    def calculate_mean(self):
+    def calculate_mean_and_size(self, increment):
         if self.arr is not None:
             self.mean = (
                 sum([p[0] for p in self.arr]) / len(self.arr), sum([p[1] for p in self.arr]) / len(self.arr))
+            self.size = increment * len(self.arr)
 
     def dist(self, blob2):
         dx = self.mean[0] - blob2.mean[0]
