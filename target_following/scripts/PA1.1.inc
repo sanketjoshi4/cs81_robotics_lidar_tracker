@@ -3,8 +3,8 @@ define lidar ranger
   sensor
   (
     range [0 2]
-    fov 90.0
-    samples 181
+    fov 360.0
+    samples 721
   )
   # generic model properties
   color "black"
