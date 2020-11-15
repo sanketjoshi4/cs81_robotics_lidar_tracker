@@ -18,7 +18,7 @@ from sensor_msgs.msg import LaserScan
 
 CMD_FREQ = 10  # Hz
 SLEEP = 2  # secs
-VEL = 0.1  # m/s
+VEL = 0.2  # m/s
 
 PI = np.pi
 
@@ -236,7 +236,7 @@ class Robot:
             rate.sleep()
 
     def chase(self, tpos, tvel):
-        lin_x = 0.1
+        lin_x = VEL
         ang_z = 0.0
 
         rpx = self.posx  # robot pos x

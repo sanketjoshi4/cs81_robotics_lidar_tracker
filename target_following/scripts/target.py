@@ -8,7 +8,7 @@ import tf
 from predictor import Predictor
 import numpy as np
 
-# TARGET.PY 
+# TARGET.PY
 # class for the target object 
 
 class Target:
@@ -16,8 +16,9 @@ class Target:
 	FREQ = 10  # Hz
 	SLEEP = 2
 	PI = np.pi
-	LINVELOCITY = 0.1
-	ANGVELOCITY = 0.1
+	LINVELOCITY = 0.2
+	ANGVELOCITY = 0.2
+	DUR_MUL = 1
 
 	def __init__(self):
 		rospy.init_node("target") # feel free to rename
@@ -79,7 +80,7 @@ class Target:
 		if sharp==1:
 			self.vel_msg.angular.z = Target.ANGVELOCITY*1.25
 			self.angzvel = Target.ANGVELOCITY*1.25
- 
+
 	def straight(self):
 		self.vel_msg.angular.z = 0
 		self.vel_msg.linear.x = Target.LINVELOCITY
@@ -90,7 +91,7 @@ class Target:
 		# setup code
 		rate = rospy.Rate(Target.FREQ)
 		beginning_time = rospy.get_rostime()
-	
+
 		while self.done==0 and not rospy.is_shutdown():
 
 			if rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) < rospy.Duration(7):
@@ -98,92 +99,92 @@ class Target:
 				self.pub.publish(self.vel_msg)
 				print "1"
 
-			if rospy.Duration(7*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(16*2) - rospy.Duration(self.time_lost):
+			if rospy.Duration(7*Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(16 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.straight()
 				self.pub.publish(self.vel_msg)
 				print "2"
 
-			if rospy.Duration(16*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(19.75*2) - rospy.Duration(self.time_lost):
+			if rospy.Duration(16 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(19.75 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.curve_left(0)
 				self.pub.publish(self.vel_msg)
 				print "3"
 
-			if rospy.Duration(19.75*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(28.5*2) - rospy.Duration(self.time_lost):
+			if rospy.Duration(19.75 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(28.5 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.curve_right(1)
 				self.pub.publish(self.vel_msg)
 				print "4"
 
-			if rospy.Duration(28.5*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(41*2) - rospy.Duration(self.time_lost):
+			if rospy.Duration(28.5 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(41 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.straight()
 				self.pub.publish(self.vel_msg)
 				print "5"
 
-			if rospy.Duration(41*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(49*2) - rospy.Duration(self.time_lost):
+			if rospy.Duration(41 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(49 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.curve_right(0)
 				self.pub.publish(self.vel_msg)
 				print "6"
 
-			if rospy.Duration(49*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(61*2) - rospy.Duration(self.time_lost):
+			if rospy.Duration(49 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(61 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.straight()
 				self.pub.publish(self.vel_msg)
 				print "7"
 
-			if rospy.Duration(61*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(69*2) - rospy.Duration(self.time_lost):
+			if rospy.Duration(61 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(69 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.curve_right(0)
 				self.pub.publish(self.vel_msg)
 				print "8"
 
-			if rospy.Duration(69*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(79*2) - rospy.Duration(self.time_lost):
+			if rospy.Duration(69 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(79 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.straight()
 				self.pub.publish(self.vel_msg)
 				print "9"
 
-			if rospy.Duration(79*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(89.5*2) - rospy.Duration(self.time_lost):
+			if rospy.Duration(79 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(89.5 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.curve_left(0)
 				self.pub.publish(self.vel_msg)
 				print "10"
-		
-			if rospy.Duration(89.5*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(99.5*2) - rospy.Duration(self.time_lost):
+
+			if rospy.Duration(89.5 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(99.5 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.straight()
 				self.pub.publish(self.vel_msg)
 				print "11"
 
-			if rospy.Duration(99.5*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(109.25*2) - rospy.Duration(self.time_lost):
+			if rospy.Duration(99.5 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(109.25 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.curve_right(0)
 				self.pub.publish(self.vel_msg)
 				print "12"
 
-			if rospy.Duration(109.25*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(122.25*2) - rospy.Duration(self.time_lost):
+			if rospy.Duration(109.25 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(122.25 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.straight()
 				self.pub.publish(self.vel_msg)
 				print "13"
 
-			if rospy.Duration(122.25*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(131.25*2) - rospy.Duration(self.time_lost):
+			if rospy.Duration(122.25 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(131.25 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.curve_right(0)
 				self.pub.publish(self.vel_msg)
 				print "14"
 
-			if rospy.Duration(131.25*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(140.25*2) - rospy.Duration(self.time_lost):
+			if rospy.Duration(131.25 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(140.25 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.straight()
 				self.pub.publish(self.vel_msg)
 				print "15"
 
-			if rospy.Duration(140.25*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(146.25*2) - rospy.Duration(self.time_lost):
+			if rospy.Duration(140.25 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(146.25 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.curve_right(0)
 				self.pub.publish(self.vel_msg)
 				print "16"
 
-			if rospy.Duration(146.25*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(150.25*2) - rospy.Duration(self.time_lost):
+			if rospy.Duration(146.25 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(150.25 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.curve_left(0)
 				self.pub.publish(self.vel_msg)
 				print "17"
 
-			if rospy.Duration(150.25*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(154.25*2) - rospy.Duration(self.time_lost):
+			if rospy.Duration(150.25 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(154.25 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.curve_right(1)
 				self.pub.publish(self.vel_msg)
 				print "18"
 
-			if rospy.Duration(154.25*2) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(155.25*2) - rospy.Duration(self.time_lost):
+			if rospy.Duration(154.25 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(155.25 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 				self.straight()
 				self.pub.publish(self.vel_msg)
 				print "19"
