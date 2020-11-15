@@ -23,8 +23,8 @@ VEL = 0.1  # m/s
 PI = np.pi
 
 # TODO : Figure out a better way to code robot's start pose .. env vars?
-START_X_MAP = 5.0  # Would change as per the map
-START_Y_MAP = 5.0  # Would change as per the map
+START_X_MAP = 3  # Would change as per the map
+START_Y_MAP = 5  # Would change as per the map
 
 
 # START_Z_MAP = 0.0
@@ -152,6 +152,8 @@ class Robot:
 
             # we detect target so decide how to move using PID-like function
             if tpos is not None and tvel is not None:
+
+                self.pub_visibility(True)  # can see the target
                 (lin_x, ang_z) = self.chase(tpos, tvel)
 
                 # recovery object will always have last known target pose to prepare for recovery mode
@@ -174,12 +176,13 @@ class Robot:
             else:  # target is out of sight, go into recovery mode
 
                 # print "In Recovery : {}".format(self.rcvr_poses)
+                self.pub_visibility(False)  # cant see the target
 
                 if not self.rcvr_poses:
                     # we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
                     self.update_rcvr()  # remember to update Recovery object's required info first
                     self.rcvr_poses = self.rcvr.recover()
-                    # print("retrieved rcvr_poses", self.rcvr_poses)
+                # print("retrieved rcvr_poses", self.rcvr_poses)
 
                 # in the middle of recovery mode
                 # separate if statement so we don't have to wait until next loop iteration to start moving once entered recovery mode
@@ -220,7 +223,7 @@ class Robot:
 
     def chase(self, tpos, tvel):
         lin_x = 0.1
-        ang_z=0.0
+        ang_z = 0.0
 
         rpx = self.posx  # robot pos x
         rpy = self.posy  # robot pos y
@@ -246,6 +249,10 @@ class Robot:
         if self.id.target is not None:
             print "PID-TargetY:", self.id.target[1]
             ang_z = self.id.target[1] * 0.2 if self.id.target is not None else 0
+
+        dist = math.sqrt((rpx - tpx) * (rpx - tpx) + (rpy - tpy) * (rpy - tpy))
+        if dist < 0.3:
+            lin_x = 0
 
         """
         speed,  angle_of_pid <- pid_like(rp, rv, tp, tv)
