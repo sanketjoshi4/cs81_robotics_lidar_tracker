@@ -36,16 +36,6 @@ class Target:
 
 		self.vel_msg = Twist() # creating inital publish message, which is altered in the main
 
-		# creating a subscriber for the map
-		#self.map = None
-		#self.subscriber = rospy.Subscriber("map", OccupancyGrid, self.map_callback, queue_size=1)
-		self.points = [(0, 2), (3.5, 2), (3.5, 4.2), (7.2, 4.2), (7.2, 0), (8.3, 0), (8.3, 8.2), (0, 7.9)]
-		self.goalangles = [PI/2, 0, PI/2, 0, -PI/2, 0, PI/2, -PI+0.02]
-		self.goalangle = self.goalangles[0]
-		self.pointnum = 0
-		self.goalx = self.points[0][0]
-		self.goaly = self.points[0][1]
-
 		self.is_lost = 0 #1 if the robot is lost from the target
 		self.done = 0 #1 if all the points have been traversed
 
@@ -158,13 +148,13 @@ class Target:
 				print "9"
 
 			beginning_time = rospy.get_rostime()
-			while rospy.get_rostime() - beginning_time < rospy.Duration(10):
+			while rospy.get_rostime() - beginning_time < rospy.Duration(9.5):
 				self.curve_left(0)
 				self.pub.publish(self.vel_msg)
 				print "10"
 
 			beginning_time = rospy.get_rostime()
-			while rospy.get_rostime() - beginning_time < rospy.Duration(7):
+			while rospy.get_rostime() - beginning_time < rospy.Duration(11.5):
 				self.straight()
 				self.pub.publish(self.vel_msg)
 				print "11"
@@ -174,6 +164,48 @@ class Target:
 				self.curve_right(0)
 				self.pub.publish(self.vel_msg)
 				print "12"
+			
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(9.5):
+				self.straight()
+				self.pub.publish(self.vel_msg)
+				print "13"
+
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(9):
+				self.curve_right(0)
+				self.pub.publish(self.vel_msg)
+				print "14"
+
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(9):
+				self.straight()
+				self.pub.publish(self.vel_msg)
+				print "15"
+
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(6):
+				self.curve_right(0)
+				self.pub.publish(self.vel_msg)
+				print "16"
+
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(3):
+				self.straight()
+				self.pub.publish(self.vel_msg)
+				print "17"
+
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(3):
+				self.curve_left(0)
+				self.pub.publish(self.vel_msg)
+				print "18"
+
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(3):
+				self.curve_right(1)
+				self.pub.publish(self.vel_msg)
+				print "19"
 
 	# class for the points on grid, copied from pa3 Archita
 class Node:
