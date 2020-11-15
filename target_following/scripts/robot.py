@@ -16,8 +16,9 @@ from nav_msgs.msg import OccupancyGrid, Odometry
 from std_msgs.msg import Bool
 from sensor_msgs.msg import LaserScan
 
-CMD_FREQ = 3  # Hz
+CMD_FREQ = 10  # Hz
 SLEEP = 2  # secs
+VEL = 0.1  # m/s
 
 PI = np.pi
 
@@ -29,44 +30,42 @@ START_Y_MAP = 5.0  # Would change as per the map
 # START_Z_MAP = 0.0
 
 class Robot:
-    VEL = 0.1  # m/s
-    PD = 0.2
 
     def __init__(self):
-        rospy.init_node("robot")  # feel free to rename
-        self.pub = rospy.Publisher("robot_0/cmd_vel", Twist, queue_size=0)
-        self.stat_pub = rospy.Publisher("visible_status", Bool, queue_size=0)  # latest one only
-        self.world_sub = rospy.Subscriber("map", OccupancyGrid, self.map_callback, queue_size=1)
-        self.odom_sub = rospy.Subscriber("robot_0/odom", Odometry, self.odom_callback)
-        self.sub_laser = rospy.Subscriber("robot_0/base_scan", LaserScan, self.laser_scan_callback, queue_size=1)
-        self.map = None
+		rospy.init_node("robot")
+       
+		self.map = None
+		
 
         # continually updated info about robot's pose wrt odom
-        self.posx = None
-        self.posy = None
-        self.angle = None
-        self.last_posx = None
-        self.last_posy = None
-        self.last_angle = None
+		self.posx = None
+		self.posy = None
+		self.angle = None
+		self.last_posx = None
+		self.last_posy = None
+		self.last_angle = None
 
         # useful transformation matrices for movement
-        self.mTo = np.array([
-            [1, 0, 1, START_X_MAP],
-            [0, 1, 0, START_Y_MAP],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1]
-        ])  # odom to map
-        self.bTo = None  # odom to base_link
-        self.world = None  # if we do not use world in here, delete this later
+		self.mTo = np.array(
+			# corrected!
+            [[1, 0, 1, START_X_MAP], [0, 1, 0, START_Y_MAP], [0, 0, 1, 0], [0, 0, 0, 1]])  # odom to map
+		self.bTo = None  # odom to base_link
+		self.world = None  # if we do not use world in here, delete this later
 
-        self.rcvr_poses = []  # all poses to move to in order to get to last detected target pose
-        self.lis = tf.TransformListener()
-        self.rcvr = None
-        self.id = Identifier()
-        self.time_last_scan = None
-        self.target_ever_found = False
+		self.rcvr_poses = []  # all poses to move to in order to get to last detected target pose
+		self.rcvr = None
+		self.id = Identifier()
+		self.time_last_scan = None
+		self.target_ever_found = False
 
-        rospy.sleep(SLEEP)
+		self.pub = rospy.Publisher("robot_0/cmd_vel", Twist, queue_size=0)
+		self.stat_pub = rospy.Publisher("visible_status", Bool, queue_size=0)  # latest one only
+		self.world_sub = rospy.Subscriber("map", OccupancyGrid, self.map_callback, queue_size=1)
+		self.odom_sub = rospy.Subscriber("robot_0/odom", Odometry, self.odom_callback)
+		self.sub_laser = rospy.Subscriber("robot_0/base_scan", LaserScan, self.laser_scan_callback, queue_size=1)
+		self.lis = tf.TransformListener()
+
+		rospy.sleep(SLEEP)
 
     def odom_callback(self, msg):
         # getting all of the odom information on the current pose of the robot
@@ -94,10 +93,10 @@ class Robot:
         self.bTo = t.dot(r)
 
     def map_callback(self, msg):
-        if self.map is None:
+	if self.map is None:
             print("loading map")
-            self.map = World(msg.data, msg.info.width, msg.info.height, msg.info.resolution, msg.header.frame_id,
-                             msg.info.origin)
+	    self.map = World(msg.data, msg.info.width, msg.info.height, msg.info.resolution, msg.header.frame_id,
+				 msg.info.origin)
             print(self.map.T)
 
     def laser_scan_callback(self, laser_scan_msg):
@@ -133,9 +132,9 @@ class Robot:
         if tpos is not None:
             print "Target Pos : ({},{})".format(
                 follower_utils.show(tpos[0]), follower_utils.show(tpos[1]))
-        # if tvel is not None:
-        # 	print "Target Vel : ({},{})".format(
-        # 		follower_utils.show(tvel[0]), follower_utils.show(tvel[1]))
+            if tvel is not None:
+                print "Target Vel : ({},{})".format(
+                    follower_utils.show(tvel[0]), follower_utils.show(tvel[1]))
         else:
             print "Target Lost"
 
@@ -152,7 +151,7 @@ class Robot:
             lin_x = 0
             ang_z = 0
 
-            tpos, tvel = self.id.get_target_pos_vel(robot=self, frame="MAP")
+            tpos, tvel = self.id.get_target_pos_vel(robot=self, frame="ODOM")
             self.target_ever_found = self.target_ever_found or tpos is not None
             self.display_target_status(tpos, tvel)
 
@@ -173,9 +172,11 @@ class Robot:
                     self.rcvr_poses = []
 
             elif rospy.get_time() - start_time < Identifier.ID_INIT_TIME:
+		self.pub_visibility(True)
                 continue
 
             elif not self.target_ever_found:
+		self.pub_visibility(True)
                 continue
 
             # elif self.rcvr is not None:  # target is out of sight, go into recovery mode
@@ -214,13 +215,13 @@ class Robot:
                             self.rcvr_poses.pop()
                             continue  # no need to waste a publication
                         else:
-                            lin_x = Robot.VEL  # rotation ensures we always move forward
+                            lin_x = VEL  # rotation ensures we always move forward
                     else:
                         lin_x = 0
                         if ang < 0:
-                            ang_z = -Robot.VEL
+                            ang_z = -VEL
                         else:  # can only be positive, near 0 is rounded to 0 and handled above
-                            ang_z = Robot.VEL
+                            ang_z = VEL
 
             vel_msg.linear.x = lin_x
             vel_msg.angular.z = ang_z
@@ -228,7 +229,7 @@ class Robot:
             rate.sleep()
 
     def chase(self, tpos, tvel):
-        lin_x = Robot.VEL
+        lin_x = 0.1
         ang_z = 0.0
 
         rpx = self.posx  # robot pos x
@@ -254,7 +255,7 @@ class Robot:
 
         if self.id.target is not None:
             print "PID-TargetY:", self.id.target[1]
-            ang_z = self.id.target[1] * Robot.PD if self.id.target is not None else 0
+            ang_z = self.id.target[1] * 0.2 if self.id.target is not None else 0
 
         dist = math.sqrt((rpx - tpx) * (rpx - tpx) + (rpy - tpy) * (rpy - tpy))
         if dist < 0.3:

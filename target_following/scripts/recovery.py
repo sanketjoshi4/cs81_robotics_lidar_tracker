@@ -39,7 +39,8 @@ class Recovery:
 		# assume in map frame
 		self.end = [self.last_known_pos.x, self.last_known_pos.y]
 		self.start = [self.robot_pos.x, self.robot_pos.y]
-		print("finding path from ", (self.start, self.end))
+		print("finding path from ", (follower_utils.show(self.start[0]),follower_utils.show(self.start[1])), "to ",
+			  (follower_utils.show(self.end[0]),follower_utils.show(self.end[1])))
 
 		# convert from map to grid; theta doesn't matter here
 		start_grid_x, start_grid_y, theta = self.world.map_to_grid(self.start[0], self.start[1], 0)
@@ -55,6 +56,12 @@ class Recovery:
 		self.start = [start_cell_x, start_cell_y]
 		self.end = [end_cell_x, end_cell_y]
 
+		# check coords are actually on grid
+		if not self.world.on_grid(start_cell_x, start_cell_y) or not self.world.on_grid(end_cell_x, end_cell_y):
+			return []
+		# if start or end coordinates have obstacle in them, then it's bad input
+		if self.world.get_cell(start_cell_x, start_cell_y) or self.world.get_cell(end_cell_x, end_cell_y):
+			return []
 
 		path = self.a_star()
 		return self.get_path_poses(path)
