@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import numpy as np
+import math
 
 import follower_utils
 from recovery import Recovery
@@ -22,7 +23,7 @@ VEL = 0.1  # m/s
 PI = np.pi
 
 # TODO : Figure out a better way to code robot's start pose .. env vars?
-START_X_MAP = 3.0  # Would change as per the map
+START_X_MAP = 5.0  # Would change as per the map
 START_Y_MAP = 5.0  # Would change as per the map
 
 
@@ -139,6 +140,8 @@ class Robot:
         vel_msg = Twist()
         print "Searching for target..."
 
+        start_time = rospy.get_time()
+
         while not rospy.is_shutdown():
             lin_x = 0
             ang_z = 0
@@ -149,10 +152,10 @@ class Robot:
 
             # we detect target so decide how to move using PID-like function
             if tpos is not None and tvel is not None:
-                (lin_x, ang_z) = self.chase(tpos,tvel)
+                (lin_x, ang_z) = self.chase(tpos, tvel)
 
                 # recovery object will always have last known target pose to prepare for recovery mode
-		tpos_map, tvel_map = self.id.get_target_pos_vel(robot=self, frame="MAP")
+                tpos_map, tvel_map = self.id.get_target_pos_vel(robot=self, frame="MAP")
                 self.rcvr.last_known_pos = Point()
                 self.rcvr.last_known_pos.x = tpos_map[0]
                 self.rcvr.last_known_pos.y = tpos_map[1]
@@ -161,19 +164,22 @@ class Robot:
                 if self.rcvr_poses:
                     self.rcvr_poses = []
 
+            elif rospy.get_time() - start_time < Identifier.ID_INIT_TIME:
+                continue
+
             elif not self.target_ever_found:
                 continue
 
             # elif self.rcvr is not None:  # target is out of sight, go into recovery mode
             else:  # target is out of sight, go into recovery mode
 
-                print "In Recovery : {}".format(self.rcvr_poses)
+                # print "In Recovery : {}".format(self.rcvr_poses)
 
                 if not self.rcvr_poses:
                     # we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
                     self.update_rcvr()  # remember to update Recovery object's required info first
                     self.rcvr_poses = self.rcvr.recover()
-		    print("retrieved rcvr_poses", self.rcvr_poses)
+                    # print("retrieved rcvr_poses", self.rcvr_poses)
 
                 # in the middle of recovery mode
                 # separate if statement so we don't have to wait until next loop iteration to start moving once entered recovery mode
@@ -191,22 +197,21 @@ class Robot:
                     ang = np.arctan2(v[1], v[0])
                     if -0.025 <= ang <= 0.025:
                         # turn finished so start moving in lin x only, if applicable
-			ang_z = 0
-                    	# remaining euclidean distance to travel, assume no movement in z-axis
-                    	dis = np.linalg.norm(np.array([0, 0]) - v)
-			if -0.025 <= dis <= 0.025:
-			    # lin x move finished, pop this pose
-			    self.rcvr_poses.pop()
-			    continue # no need to waste a publication
+                        ang_z = 0
+                        # remaining euclidean distance to travel, assume no movement in z-axis
+                        dis = np.linalg.norm(np.array([0, 0]) - v)
+                        if -0.025 <= dis <= 0.025:
+                            # lin x move finished, pop this pose
+                            self.rcvr_poses.pop()
+                            continue  # no need to waste a publication
                         else:
-                            lin_x = VEL # rotation ensures we always move forward
+                            lin_x = VEL  # rotation ensures we always move forward
                     else:
                         lin_x = 0
-			if ang < 0:
-			    ang_z = -VEL
-			else: # can only be positive, near 0 is rounded to 0 and handled above
-			    ang_z = VEL
-                    
+                        if ang < 0:
+                            ang_z = -VEL
+                        else:  # can only be positive, near 0 is rounded to 0 and handled above
+                            ang_z = VEL
 
             vel_msg.linear.x = lin_x
             vel_msg.angular.z = ang_z
@@ -214,8 +219,8 @@ class Robot:
             rate.sleep()
 
     def chase(self, tpos, tvel):
-
         lin_x = 0.1
+        ang_z=0.0
 
         rpx = self.posx  # robot pos x
         rpy = self.posy  # robot pos y
@@ -232,37 +237,86 @@ class Robot:
         tvy = tvel[1]  # target vel y
 
         obs = self.id.obs
-        print "RP:{},{},{}".format(follower_utils.show(rpx), follower_utils.show(rpy), follower_utils.show(rpz))
-        print "RV:{},{},{}".format(follower_utils.show(rvx), follower_utils.show(rvy), follower_utils.show(rvz))
-        print "TP:{},{}".format(follower_utils.show(tpx), follower_utils.show(tpy))
-        print "TV:{},{}".format(follower_utils.show(tvx), follower_utils.show(tvy))
 
-        print "BaseTY:", self.id.target[1]
-        ang_z = self.id.target[1] if self.id.target is not None else 0
+        # print "RP:{},{},{}".format(follower_utils.show(rpx), follower_utils.show(rpy), follower_utils.show(rpz))
+        # print "RV:{},{},{}".format(follower_utils.show(rvx), follower_utils.show(rvy), follower_utils.show(rvz))
+        # print "TP:{},{}".format(follower_utils.show(tpx), follower_utils.show(tpy))
+        # print "TV:{},{}".format(follower_utils.show(tvx), follower_utils.show(tvy))
+
+        if self.id.target is not None:
+            print "PID-TargetY:", self.id.target[1]
+            ang_z = self.id.target[1] * 0.2 if self.id.target is not None else 0
 
         """
-        chase :: (rp, rv, tp, tv, obs) -> angle
-            speed,  angle_of_pid <- pid_like(rp, rv, tp, tv)
-            if obs @ angle_of_pid:
-                angle_left <- search left
-                angle_right <- search left
-                angle_of_tangent <- min (a_L,a_R)
-                angle_wiggle <- angle + get_wiggle() # angle diff in robot and target vels
-            else:
-                angle_of_pid
+        speed,  angle_of_pid <- pid_like(rp, rv, tp, tv)
+        if not obs @ angle_of_pid:
+            return angle_of_pid
+        angle_left <- search left
+        angle_right <- search left
+        angle_of_tangent <- min (a_L,a_R)
+        angle_wiggle <- angle + get_wiggle() # angle diff in robot and target vels
+        return angle_of_pid + angle_wiggle
+        """
 
-        pid_like :: (rp, rv, tp, tv) -> angle
+        # (angle, vel_tuple) = self.pid_like((rpx, rpy), (rvx, rvy), (tpx, tpy), (tvx, tvy))
+
+        return lin_x, ang_z
+
+    def pid_like(self, rp, rv, tp, tv):
+        """
+            pid_like :: (rp, rv, tp, tv) -> angle
             split into x and y
             consider from the target's frame of ref
             get the dx and dy
             convert back to robot's frame
+        """
+        # getting individual components, assuming rv and tv are tuples (rv is robot velocity, tv is predicted target velocity)
+        xrv = rv[0]
+        yrv = rv[1]
+        xtv = tv[0]
+        ytv = tv[1]
+        # rp is robot position, tp is target position
+        xrp = rp[0]
+        yrp = rp[1]
+        xtp = tp[0]
+        ytp = tp[1]
+        # direct velocity
+        diff_x = xtp - xrp
+        diff_y = ytp - yrp
+        # normalizing difference, this produces the direct velocity to the target from the robot (aka, this produces
+        # a normalized velocity in the direction of the target's current position from the robot's current position)
+        direct_velx = diff_x / (math.pow(diff_x, 2) + math.pow(diff_y, 2))
+        direct_vely = diff_y / (math.pow(diff_x, 2) + math.pow(diff_y, 2))
 
-        get_wiggle :: -> (rv, tv) angle
+        # averaging the direct velocities and the predicted velocities
+        robot_velx = (xtv + direct_velx) / 2
+        robot_vely = (ytv + direct_vely) / 2
+        vel_tuple = (robot_velx, robot_vely)
+        angle = math.atan2(robot_vely, robot_velx)
+        return (angle, vel_tuple)
+
+    def get_wiggle(self, rv, tv):
+        """
+            get_wiggle :: -> (rv, tv) angle
             wiggle_angle <- angle_btwn(rv,tv)
             return wiggle angle
         """
+        # getting individual components, assuming rv and tv are tuples (rv is robot velocity, tv is target velocity)
+        xrv = rv[0]
+        yrv = rv[1]
+        xtv = tv[0]
+        ytv = tv[1]
+        # taking dot product
+        dot = np.dot([xrv, yrv], [xtv, ytv])
 
-        return lin_x, ang_z
+        # getting lengths of both vectors
+        lenrv = math.pow(xrv * xrv + yrv * yrv, 0.5)
+        lentv = math.pow(xtv * xtv + ytv * ytv, 0.5)
+        # getting angle between
+        angle = math.acos(dot / (lenrv * lentv))
+
+        # returning the angle between the two vector
+        return angle
 
     def get_movement_transform(self):
 
@@ -275,6 +329,7 @@ class Robot:
         mat2 = np.matrix([[cz2, -sz2, 0, self.last_posx], [sz2, cz2, 0, self.last_posy], [0, 0, 1, 0], [0, 0, 0, 1]])
 
         return mat2.getI().dot(mat1)
+
 
 if __name__ == "__main__":
     # we'll probably set up target like this from main.py?
