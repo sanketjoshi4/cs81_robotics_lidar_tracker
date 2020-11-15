@@ -1,4 +1,4 @@
-include "PA1.inc"
+include "demo.inc"
 
 define floorplan model
 (
@@ -22,10 +22,10 @@ interval_sim 10  # simulation timestep in milliseconds
 
 window
 (
-  size [ 700 700 ]
-  center [ 6.364 5.133 ]
+  size [ 804 895 ]
+  center [ 5.361 5.182 ]
   rotate [ 0.000 0.000 ]
-  scale 45.950
+  scale 74.003
 
   #show_data 1
 )
@@ -33,7 +33,7 @@ window
 floorplan
 (
   name "PA1"
-  bitmap "archipelago.png"
+  bitmap "demo.png"
   size [ 10.750 10.750 1.000 ]
   pose [ 5.375 5.375 0.000 0.000 ]
 )
