@@ -50,12 +50,13 @@ class Identifier:
 
         self.last_blobs = {}  # blobs during last scan
         self.last_target = None  # (x, y)
+        self.last_known_target = None  # (x, y)
         self.last_obs = None  # list of Blob items
         self.last_target_vel = None
 
         self.status = None  # Amongst
 
-    def blobify(self, laser_scan_msg):
+    def blobify(self, laser_scan_msg, robot):
         """ This updates the dict of blobs. Each blob is stored against a place holder id """
 
         amin = laser_scan_msg.angle_min  # Minimum angle of overall scan
@@ -91,7 +92,7 @@ class Identifier:
         for blob_id, blob in self.blobs.items():
             blob.calculate_mean_and_size(incr)
 
-        print [b.show() for _, b in self.blobs.items()]
+        print [b.show(robot) for _, b in self.blobs.items()]
 
     def classify(self, movement_transform):
         """ This is responsible for separating moving blobs from static ones. Saves the blob in motion as the target """
@@ -123,9 +124,9 @@ class Identifier:
                 is_different = Identifier.THRESH_BLOB_MOVEMENT < shift
 
                 close_to_last_target = True
-                if self.last_target is not None:
-                    dtx = self.last_target[0] - blob.mean[0]
-                    dty = self.last_target[1] - blob.mean[1]
+                if self.last_known_target is not None:
+                    dtx = self.last_known_target[0] - blob.mean[0]
+                    dty = self.last_known_target[1] - blob.mean[1]
                     close_to_last_target = np.sqrt(dtx * dtx + dty * dty) < 0.5
 
                 if is_different:
@@ -148,6 +149,7 @@ class Identifier:
         # Save last blobs and target
         self.last_obs = copy.deepcopy(self.obs)
         self.last_target = copy.deepcopy(self.target)  # in base_scan ref
+        self.last_known_target = copy.deepcopy(self.target) if self.target is not None else self.last_known_target
         # self.last_target_vel = copy.deepcopy(self.target_vel)  # in base_scan ref
 
         # Update blobs and target
@@ -247,8 +249,13 @@ class Blob:
         dy = self.mean[1] - blob2.mean[1]
         return float(np.sqrt(dx * dx + dy * dy))
 
-    def show(self):
+    def show(self, robot):
+        mean_map = Identifier.get_pos(
+            target=self.mean,
+            robot_x=robot.posx, robot_y=robot.posy, robot_angle=robot.angle,
+            trans_odom_to_map=robot.mTo, frame="MAP"
+        )
         return "{}:[{}]@({},{})".format(self.id,
                                         follower_utils.show(self.size),
-                                        follower_utils.show(self.mean[0], 1),
-                                        follower_utils.show(self.mean[1], 1))
+                                        follower_utils.show(mean_map[0], 1),
+                                        follower_utils.show(mean_map[1], 1))

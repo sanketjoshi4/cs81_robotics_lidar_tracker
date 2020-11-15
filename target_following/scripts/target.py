@@ -188,24 +188,24 @@ class Target:
 				self.pub.publish(self.vel_msg)
 				print "19"
 
-			# if self.is_lost==1:
-			# 	current_time = rospy.get_rostime()
-			# 	#current_angle = self.angle
-			# 	#print current_time.to_sec()
-			# while self.is_lost==1 and not rospy.is_shutdown():
-			# 	self.vel_msg.angular.z = 0 #Target.ANGVELOCITY*1.5
-			# 	self.vel_msg.linear.x = 0
-			# 	self.pub.publish(self.vel_msg)
-			# 	if self.is_lost==0:
-			# 		new_time = rospy.get_rostime()
-			# 		print new_time.to_sec()
-			# 		self.time_lost += current_time.to_sec() - new_time.to_sec()
-			# 		# print self.time_lost
-			# 		#while self.angle - current_angle > 0.2 or self.angle - current_angle < -0.2:
-			# 			#self.vel_msg.angular.z = Target.ANGVELOCITY*1.5
-			# 			#self.vel_msg.linear.x = 0
-			# 			#self.pub.publish(self.vel_msg)
-			# 		break
+			if self.is_lost==1:
+				current_time = rospy.get_rostime()
+				#current_angle = self.angle
+				#print current_time.to_sec()
+			while self.is_lost==1 and not rospy.is_shutdown():
+				self.vel_msg.angular.z = 0 #Target.ANGVELOCITY*1.5
+				self.vel_msg.linear.x = 0
+				self.pub.publish(self.vel_msg)
+				if self.is_lost==0:
+					new_time = rospy.get_rostime()
+					print new_time.to_sec()
+					self.time_lost += current_time.to_sec() - new_time.to_sec()
+					# print self.time_lost
+					#while self.angle - current_angle > 0.2 or self.angle - current_angle < -0.2:
+						#self.vel_msg.angular.z = Target.ANGVELOCITY*1.5
+						#self.vel_msg.linear.x = 0
+						#self.pub.publish(self.vel_msg)
+					break
 
 	def move_fwd(self):
 		curr_time = rospy.get_rostime()
