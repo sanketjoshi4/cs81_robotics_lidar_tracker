@@ -148,25 +148,25 @@ class Target:
 				print "9"
 
 			beginning_time = rospy.get_rostime()
-			while rospy.get_rostime() - beginning_time < rospy.Duration(9.5):
+			while rospy.get_rostime() - beginning_time < rospy.Duration(10.5):
 				self.curve_left(0)
 				self.pub.publish(self.vel_msg)
 				print "10"
 
 			beginning_time = rospy.get_rostime()
-			while rospy.get_rostime() - beginning_time < rospy.Duration(11.5):
+			while rospy.get_rostime() - beginning_time < rospy.Duration(10):
 				self.straight()
 				self.pub.publish(self.vel_msg)
 				print "11"
 
 			beginning_time = rospy.get_rostime()
-			while rospy.get_rostime() - beginning_time < rospy.Duration(8):
+			while rospy.get_rostime() - beginning_time < rospy.Duration(9.75):
 				self.curve_right(0)
 				self.pub.publish(self.vel_msg)
 				print "12"
 			
 			beginning_time = rospy.get_rostime()
-			while rospy.get_rostime() - beginning_time < rospy.Duration(9.5):
+			while rospy.get_rostime() - beginning_time < rospy.Duration(13):
 				self.straight()
 				self.pub.publish(self.vel_msg)
 				print "13"
@@ -190,20 +190,20 @@ class Target:
 				print "16"
 
 			beginning_time = rospy.get_rostime()
-			while rospy.get_rostime() - beginning_time < rospy.Duration(3):
-				self.straight()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(4):
+				self.curve_left(0)
 				self.pub.publish(self.vel_msg)
 				print "17"
 
 			beginning_time = rospy.get_rostime()
-			while rospy.get_rostime() - beginning_time < rospy.Duration(3):
-				self.curve_left(0)
+			while rospy.get_rostime() - beginning_time < rospy.Duration(4):
+				self.curve_right(1)
 				self.pub.publish(self.vel_msg)
 				print "18"
 
 			beginning_time = rospy.get_rostime()
-			while rospy.get_rostime() - beginning_time < rospy.Duration(3):
-				self.curve_right(1)
+			while rospy.get_rostime() - beginning_time < rospy.Duration(1):
+				self.straight()
 				self.pub.publish(self.vel_msg)
 				print "19"
 
