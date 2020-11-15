@@ -21,189 +21,210 @@ VEL = 0.1
 
 
 class Target:
-	def __init__(self):
-		rospy.init_node("target") # feel free to rename
-		self.pub = rospy.Publisher("robot_1/cmd_vel", Twist, queue_size=0)
-		self.stat_sub = rospy.Subscriber("visible_status", Bool, self.visibility_callback, queue_size=1) # only care about most recent msg
-		self.sub = rospy.Subscriber("robot_1/odom", Odometry, self.odom_callback)
-		rospy.sleep(SLEEP)
+    def __init__(self):
+        rospy.init_node("target")  # feel free to rename
+        self.pub = rospy.Publisher("robot_1/cmd_vel", Twist, queue_size=0)
+        self.stat_sub = rospy.Subscriber("visible_status", Bool, self.visibility_callback,
+                                         queue_size=1)  # only care about most recent msg
+        self.sub = rospy.Subscriber("robot_1/odom", Odometry, self.odom_callback)
+        rospy.sleep(SLEEP)
 
-		self.posx = 0 # initalizing target x position at 0
-		self.posy = 0 # initializing target y position at 0
-		self.linxvel = 0 # initializing linear velocity at 0
-		self.angzvel = 0 # initializing angular velocity at 0
-		self.angle = 0 # current pose angle
+        self.posx = 0  # initalizing target x position at 0
+        self.posy = 0  # initializing target y position at 0
+        self.linxvel = 0  # initializing linear velocity at 0
+        self.angzvel = 0  # initializing angular velocity at 0
+        self.angle = 0  # current pose angle
 
-		self.trans_msg = Twist()
-		self.rot_msg = Twist() # creating inital publish message, which is altered in the main
+        self.vel_msg = Twist()  # creating inital publish message, which is altered in the main
 
-		# creating a subscriber for the map
-		#self.map = None
-		#self.subscriber = rospy.Subscriber("map", OccupancyGrid, self.map_callback, queue_size=1)
-		self.points = [(0, 2), (3.5, 2), (3.5, 4.2), (7.2, 4.2), (7.2, 0), (8.3, 0), (8.3, 8.2), (0, 7.9)]
-		self.goalangles = [PI/2, 0, PI/2, 0, -PI/2, 0, PI/2, -PI+0.02]
-		self.goalangle = self.goalangles[0]
-		self.pointnum = 0
-		self.goalx = self.points[0][0]
-		self.goaly = self.points[0][1]
+        self.is_lost = 0  # 1 if the robot is lost from the target
+        self.done = 0  # 1 if all the points have been traversed
 
-		self.is_lost = 0 #1 if the robot is lost from the target
-		self.done = 0 #1 if all the points have been traversed
+        # to test predictor
+        # self.predictor = Predictor()
 
-		#to test predictor
-		#self.predictor = Predictor()
+        rospy.sleep(2)
 
-		rospy.sleep(2)
+    def visibility_callback(self, msg):
+        # if lost,
+        if msg.data == False:
+            self.is_lost = 1
+        # if not lost
+        else:
+            self.is_lost = 0
 
-	def visibility_callback(self, msg):
-		# if lost,
-		if msg.data==False:
-			self.is_lost=1
-		# if not lost
-		else:
-			self.is_lost=0
+    # from Archita pa1, modified slightly
+    def odom_callback(self, odom_message):
+        # getting all of the odom information on the current pose of the robot
+        self.posx = odom_message.pose.pose.position.x
+        self.posy = odom_message.pose.pose.position.y
+        # from https://answers.ros.org/question/11545/plotprint-rpy-from-quaternion/#17106
+        (roll, pitch, yaw) = tf.transformations.euler_from_quaternion(
+            [odom_message.pose.pose.orientation.x, odom_message.pose.pose.orientation.y,
+             odom_message.pose.pose.orientation.z, odom_message.pose.pose.orientation.w])
+        self.angle = yaw
 
-	# from Archita pa1, modified slightly
-	def odom_callback(self, odom_message):
-		# getting all of the odom information on the current pose of the robot
-		self.posx = odom_message.pose.pose.position.x
-		self.posy = odom_message.pose.pose.position.y
-		# from https://answers.ros.org/question/11545/plotprint-rpy-from-quaternion/#17106
-		(roll, pitch, yaw) = tf.transformations.euler_from_quaternion([odom_message.pose.pose.orientation.x, odom_message.pose.pose.orientation.y, odom_message.pose.pose.orientation.z, odom_message.pose.pose.orientation.w])
-		self.angle = yaw
+    # changing the message to simply rotate the robot
+    def curve_right(self, sharp):
+        self.vel_msg.angular.z = -ANGVELOCITY
+        self.vel_msg.linear.x = LINVELOCITY
+        self.linxvel = LINVELOCITY
+        self.angzvel = -ANGVELOCITY
+        if sharp == 1:
+            self.vel_msg.angular.z = -ANGVELOCITY * 1.25
+            self.angzvel = -ANGVELOCITY * 1.25
 
-	# changing the message to simply rotate the robot
-	def rotate(self):
-		self.rot_msg.angular.z = ANGVELOCITY
-		self.angzvel = ANGVELOCITY
+    def curve_left(self, sharp):
+        self.vel_msg.angular.z = ANGVELOCITY
+        self.vel_msg.linear.x = LINVELOCITY
+        self.linxvel = LINVELOCITY
+        self.angzvel = ANGVELOCITY
+        if sharp == 1:
+            self.vel_msg.angular.z = ANGVELOCITY * 1.25
+            self.angzvel = ANGVELOCITY * 1.25
 
-	# changing the message to stop rotating the robot
-	def stop_rotate(self):
-		self.rot_msg.angular.z = 0
-		self.angzvel = 0
+    def straight(self):
+        self.vel_msg.angular.z = 0
+        self.vel_msg.linear.x = LINVELOCITY
+        self.linxvel = LINVELOCITY
+        self.angzvel = 0
 
-	# changing the message to translate the robot
-	def translate(self):
-		self.trans_msg.linear.x = LINVELOCITY
-		self.linxvel = LINVELOCITY
+    def main(self):
+        # setup code
+        rate = rospy.Rate(FREQ)
+        beginning_time = rospy.get_rostime()
 
-	# changing the message to stop translating the robot
-	def stop_translate(self):
-		self.trans_msg.linear.x = 0
-		self.linxvel = 0
+        while self.done == 0 and not rospy.is_shutdown():
+            # from Josephine's previous commit
 
-	# checking if the goal angle is equal to the current angle and returning a boolean
-	def check_angle(self):
-		if -0.02 <= self.angle - self.goalangle <= 0.02:
-			return 1
-		else:
-			return 0
+            while rospy.get_rostime() - beginning_time < rospy.Duration(7):
+                self.curve_left(0)
+                self.pub.publish(self.vel_msg)
+                print "1"
 
-	# verifying that the robot is at the correxct x
-	def check_x(self):
-		if -0.08 <= self.posx - self.goalx <= 0.08:
-			return 1
-		else:
-			return 0
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(9):
+                self.straight()
+                self.pub.publish(self.vel_msg)
+                print "2"
 
-	# verifying that the robot is at the correct y
-	def check_y(self):
-		if -0.08 <= self.posy - self.goaly <= 0.08:
-			return 1
-		else:
-			return 0
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(3.75):
+                self.curve_left(0)
+                self.pub.publish(self.vel_msg)
+                print "3"
 
-	# updating which points are the goal points
-	def update_goal(self):
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(8.75):
+                self.curve_right(1)
+                self.pub.publish(self.vel_msg)
+                print "4"
 
-		# test code to see if lost
-		#if self.pointnum==2:
-			#self.is_lost = 1
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(12.5):
+                self.straight()
+                self.pub.publish(self.vel_msg)
+                print "5"
 
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(8):
+                self.curve_right(0)
+                self.pub.publish(self.vel_msg)
+                print "6"
 
-		# incrementing the number of the point we are on
-		self.pointnum = self.pointnum + 1
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(12):
+                self.straight()
+                self.pub.publish(self.vel_msg)
+                print "7"
 
-		# decrementing if is lost
-		if self.is_lost==1 and self.pointnum >= 2:
-			self.pointnum = self.pointnum-2
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(8):
+                self.curve_right(0)
+                self.pub.publish(self.vel_msg)
+                print "8"
 
-		# if gone too much, finish
-		if self.pointnum >= len(self.points):
-			self.done=1
-			return
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(10):
+                self.straight()
+                self.pub.publish(self.vel_msg)
+                print "9"
 
-		# using the next point's information as the goal
-		self.goalx = self.points[self.pointnum][0]
-		self.goaly = self.points[self.pointnum][1]
-		self.goalangle = self.goalangles[self.pointnum]
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(9.5):
+                self.curve_left(0)
+                self.pub.publish(self.vel_msg)
+                print "10"
 
-		# goal angle is the opposite
-		if self.is_lost==1:
-			self.goalangle = self.goalangles[self.pointnum+1] - PI + 0.01
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(11.5):
+                self.straight()
+                self.pub.publish(self.vel_msg)
+                print "11"
 
-	def move(self):
-		# checking the angle
-		anglecheck = self.check_angle()
-		if anglecheck==0:
-			# rotate if not correct angle
-			self.rotate()
-			self.pub.publish(self.rot_msg)
-		# if correct angle, check position
-		else:
-			xcheck = self.check_x()
-			ycheck = self.check_y()
-			# translate if not correct position
-			if xcheck==0 or ycheck==0:
-				self.stop_rotate()
-				self.pub.publish(self.rot_msg)
-				self.translate()
-				self.pub.publish(self.trans_msg)
-			else:
-				self.stop_translate()
-				self.pub.publish(self.trans_msg)
-				self.update_goal()
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(8):
+                self.curve_right(0)
+                self.pub.publish(self.vel_msg)
+                print "12"
 
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(9.5):
+                self.straight()
+                self.pub.publish(self.vel_msg)
+                print "13"
 
-	def main(self):
-		# setup code
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(9):
+                self.curve_right(0)
+                self.pub.publish(self.vel_msg)
+                print "14"
 
-		rate = rospy.Rate(FREQ)
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(9):
+                self.straight()
+                self.pub.publish(self.vel_msg)
+                print "15"
 
-		while self.done==0 and not rospy.is_shutdown():
-			self.move()
-			# to test predictor
-			#self.predictor.update_targetpos(self.posx, self.posy, self.linxvel, self.angzvel)
-			#self.predictor.predict(self.predictor.poses)
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(6):
+                self.curve_right(0)
+                self.pub.publish(self.vel_msg)
+                print "16"
 
-	def simple_main(self):
-		""" A simple test to check if target is identified, robot moves in straight line """
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(3):
+                self.straight()
+                self.pub.publish(self.vel_msg)
+                print "17"
 
-		vel_msg = Twist()
-		rate = rospy.Rate(FREQ)
-		start_time = rospy.get_rostime()
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(3):
+                self.curve_left(0)
+                self.pub.publish(self.vel_msg)
+                print "18"
 
-		while not rospy.is_shutdown() and rospy.get_rostime() - start_time < rospy.Duration(100):
-			vel_msg.angular.z = 0
-			vel_msg.linear.x = VEL
-			self.pub.publish(vel_msg)
-			rate.sleep()
+            beginning_time = rospy.get_rostime()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(3):
+                self.curve_right(1)
+                self.pub.publish(self.vel_msg)
+                print "19"
 
 
 # class for the points on grid, copied from pa3 Archita
 class Node:
-	# initializing basic values of the node
-	def __init__(self, x, y, grid, goalx, goaly):
-		# self.value = grid.get_cell(x, y)
-		self.x = x
-		self.y = y
-		self.prev = None
+    # initializing basic values of the node
+    def __init__(self, x, y, grid, goalx, goaly):
+        # self.value = grid.get_cell(x, y)
+        self.x = x
+        self.y = y
+        self.prev = None
 
-	# setting the previous node
-	def set_prev(self, other_node):
-		self.prev = other_node
+    # setting the previous node
+    def set_prev(self, other_node):
+        self.prev = other_node
 
 
 if __name__ == "__main__":
-	t = Target()
-	t.simple_main()
+    t = Target()
+    t.main()
