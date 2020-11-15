@@ -23,8 +23,8 @@ VEL = 0.1  # m/s
 PI = np.pi
 
 # TODO : Figure out a better way to code robot's start pose .. env vars?
-START_X_MAP = 3  # Would change as per the map
-START_Y_MAP = 5  # Would change as per the map
+START_X_MAP = 3.0  # Would change as per the map
+START_Y_MAP = 5.0  # Would change as per the map
 
 
 # START_Z_MAP = 0.0
@@ -89,10 +89,11 @@ class Robot:
         self.bTo = t.dot(r)
 
     def map_callback(self, msg):
-        print("loading map")
-        self.map = World(msg.data, msg.info.width, msg.info.height, msg.info.resolution, msg.header.frame_id,
-                         msg.info.origin)
-        print(self.map.T)
+	if self.map is None:
+            print("loading map")
+	    self.map = World(msg.data, msg.info.width, msg.info.height, msg.info.resolution, msg.header.frame_id,
+				 msg.info.origin)
+            print(self.map.T)
 
     def laser_scan_callback(self, laser_scan_msg):
         """ Uses laser scan to update target position """

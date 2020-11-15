@@ -50,6 +50,9 @@ class Recovery:
 		start_cell_x, start_cell_y = self.world.grid_to_cell(start_grid_x, start_grid_y)
 		end_cell_x, end_cell_y = self.world.grid_to_cell(end_grid_x, end_grid_y)
 
+		print(start_cell_x, start_cell_y)
+		print(end_cell_x, end_cell_y)
+
 		self.start = [start_cell_x, start_cell_y]
 		self.end = [end_cell_x, end_cell_y]
 
