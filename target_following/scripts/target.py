@@ -34,8 +34,7 @@ class Target:
 		self.angzvel = 0 # initializing angular velocity at 0
 		self.angle = 0 # current pose angle
 
-		self.trans_msg = Twist()
-		self.rot_msg = Twist() # creating inital publish message, which is altered in the main
+		self.vel_msg = Twist() # creating inital publish message, which is altered in the main
 
 		# creating a subscriber for the map
 		#self.map = None
@@ -73,111 +72,110 @@ class Target:
 		self.angle = yaw
 
 	# changing the message to simply rotate the robot
-	def rotate(self):
-		self.rot_msg.angular.z = ANGVELOCITY
-		self.angzvel = ANGVELOCITY
-
-	# changing the message to stop rotating the robot
-	def stop_rotate(self):
-		self.rot_msg.angular.z = 0
-		self.angzvel = 0
-
-	# changing the message to translate the robot
-	def translate(self):
-		self.trans_msg.linear.x = LINVELOCITY
+	def curve_right(self, sharp):
+		self.vel_msg.angular.z = -ANGVELOCITY
+		self.vel_msg.linear.x = LINVELOCITY
 		self.linxvel = LINVELOCITY
+		self.angzvel = -ANGVELOCITY
+		if sharp==1:
+			self.vel_msg.angular.z = -ANGVELOCITY*1.25
+			self.angzvel = -ANGVELOCITY*1.25
 
-	# changing the message to stop translating the robot
-	def stop_translate(self):
-		self.trans_msg.linear.x = 0
-		self.linxvel = 0
-
-	# checking if the goal angle is equal to the current angle and returning a boolean
-	def check_angle(self):
-		if -0.02 <= self.angle - self.goalangle <= 0.02:
-			return 1
-		else:
-			return 0
-
-	# verifying that the robot is at the correxct x
-	def check_x(self):
-		if -0.08 <= self.posx - self.goalx <= 0.08:
-			return 1
-		else:
-			return 0
-
-	# verifying that the robot is at the correct y
-	def check_y(self):
-		if -0.08 <= self.posy - self.goaly <= 0.08:
-			return 1
-		else:
-			return 0
-
-	 #updating which points are the goal points
-	def update_goal(self):
-
-		# test code to see if lost
-		#if self.pointnum==2:
-			#self.is_lost = 1
-
-
-		# incrementing the number of the point we are on
-		self.pointnum = self.pointnum + 1
-
-		# decrementing if is lost
-		if self.is_lost==1 and self.pointnum >= 2:
-			self.pointnum = self.pointnum-2
-
-		# if gone too much, finish
-		if self.pointnum >= len(self.points):
-			self.done=1
-			return
-
-		# using the next point's information as the goal
-		self.goalx = self.points[self.pointnum][0]
-		self.goaly = self.points[self.pointnum][1]
-		self.goalangle = self.goalangles[self.pointnum]
-
-		# goal angle is the opposite
-		if self.is_lost==1:
-			self.goalangle = self.goalangles[self.pointnum+1] - PI + 0.01
-
-	def move(self):
-		# checking the angle
-		anglecheck = self.check_angle()
-		if anglecheck==0:
-			# rotate if not correct angle
-			self.rotate()
-			self.pub.publish(self.rot_msg)
-		# if correct angle, check position
-		else:
-			xcheck = self.check_x()
-			ycheck = self.check_y()
-			# translate if not correct position
-			if xcheck==0 or ycheck==0:
-				self.stop_rotate()
-				self.pub.publish(self.rot_msg)
-				self.translate()
-				self.pub.publish(self.trans_msg)
-			else:
-				self.stop_translate()
-				self.pub.publish(self.trans_msg)
-				self.update_goal()
-
+	def curve_left(self, sharp):
+		self.vel_msg.angular.z = ANGVELOCITY
+		self.vel_msg.linear.x = LINVELOCITY
+		self.linxvel = LINVELOCITY
+		self.angzvel = ANGVELOCITY
+		if sharp==1:
+			self.vel_msg.angular.z = ANGVELOCITY*1.25
+			self.angzvel = ANGVELOCITY*1.25
+ 
+	def straight(self):
+		self.vel_msg.angular.z = 0
+		self.vel_msg.linear.x = LINVELOCITY
+		self.linxvel = LINVELOCITY
+		self.angzvel = 0
 
 	def main(self):
 		# setup code
-
 		rate = rospy.Rate(FREQ)
+		beginning_time = rospy.get_rostime()
 
 		while self.done==0 and not rospy.is_shutdown():
-			self.move()
-			# to test predictor
-			#self.predictor.update_targetpos(self.posx, self.posy, self.linxvel, self.angzvel)
-			#self.predictor.predict(self.predictor.poses)
+			# from Josephine's previous commit
+			
+			while rospy.get_rostime() - beginning_time < rospy.Duration(7):
+				self.curve_left(0)
+				self.pub.publish(self.vel_msg)
+				print "1"
 
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(9):
+				self.straight()
+				self.pub.publish(self.vel_msg)
+				print "2"
 
-# class for the points on grid, copied from pa3 Archita
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(3.75):
+				self.curve_left(0)
+				self.pub.publish(self.vel_msg)
+				print "3"
+
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(8.75):
+				self.curve_right(1)
+				self.pub.publish(self.vel_msg)
+				print "4"
+
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(12.5):
+				self.straight()
+				self.pub.publish(self.vel_msg)
+				print "5"
+
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(8):
+				self.curve_right(0)
+				self.pub.publish(self.vel_msg)
+				print "6"
+
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(12):
+				self.straight()
+				self.pub.publish(self.vel_msg)
+				print "7"
+			
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(8):
+				self.curve_right(0)
+				self.pub.publish(self.vel_msg)
+				print "8"
+
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(10):
+				self.straight()
+				self.pub.publish(self.vel_msg)
+				print "9"
+
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(10):
+				self.curve_left(0)
+				self.pub.publish(self.vel_msg)
+				print "10"
+
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(7):
+				self.straight()
+				self.pub.publish(self.vel_msg)
+				print "11"
+
+			beginning_time = rospy.get_rostime()
+			while rospy.get_rostime() - beginning_time < rospy.Duration(8):
+				self.curve_right(0)
+				self.pub.publish(self.vel_msg)
+				print "12"
+
+	# class for the points on grid, copied from pa3 Archita
 class Node:
 	# initializing basic values of the node
 	def __init__(self, x, y, grid, goalx, goaly):
