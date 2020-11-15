@@ -9,11 +9,12 @@ import follower_utils
 class Identifier:
     """ Rsponsible for using laser scan data to identify obstacles and moving entities """
 
-    SCAN_FREQ = 3.0  # Hz
+    SCAN_FREQ = 1  # Hz
     ID_INIT_TIME = 3.0  # seconds before ID first detects the target
+    LASER_RANGE = 2.0
 
     # The minimum change in laser reading between adjacent angles, to consider them to be coming from different objects
-    THRESH_RADIALLY_SEPARATE = 0.5
+    THRESH_RADIALLY_SEPARATE = 0.6
 
     # The maximum distance a blob's mean can move to imply that it's stationary
     THRESH_BLOB_STATIC = 0.5
@@ -23,6 +24,8 @@ class Identifier:
     # Hence, we compare with all blobs in the last scan and the ones that have a large difference are probably
     # Different blobs and the ones with a small distance, but greater than THRESH_BLOB_STATIC, are moving blobs
     THRESH_BLOB_MOVEMENT = 1.5
+
+    THRESH_TARGET_SIZE = 0.4
 
     # Below are the statuses based on distance from target
     STATUS_CLOSE = 1
@@ -67,6 +70,11 @@ class Identifier:
 
         # identify blobs
         for idx, dist in enumerate(arr):
+
+            if dist >= Identifier.LASER_RANGE:
+                blob_id += 1
+                continue
+
             angle = amin + incr * idx
             incident = (dist * np.cos(angle), dist * np.sin(angle))
 
@@ -75,23 +83,22 @@ class Identifier:
                 blob_id += 1
                 self.blobs[blob_id] = Blob(blob_id)
 
+            if blob_id not in self.blobs:
+                self.blobs[blob_id] = Blob(blob_id)
             self.blobs[blob_id].add_point(incident)
 
         # Calculate blob means
         for blob_id, blob in self.blobs.items():
-            blob.calculate_mean()
+            blob.calculate_mean_and_size(incr)
 
-        # print [b.show() for _, b in self.blobs.items()]
+        print [b.show() for _, b in self.blobs.items()]
 
     def classify(self, movement_transform):
         """ This is responsible for separating moving blobs from static ones. Saves the blob in motion as the target """
 
         # TODO : In case of multiple moving objects, use target's last position as a weight in identifying the target
-
-        # Pick out moving blobs
-        obs = []
+        obs = set()
         target = None
-        shift_min_target = 100
 
         for last_blob_id, last_blob in self.last_blobs.items():
             # For every blob in last scan
@@ -103,27 +110,40 @@ class Identifier:
             for blob_id, blob in self.blobs.items():
                 # Compare with every blob in current scan
 
-                dx = last_mean_now[0][0] - blob.mean[0]
-                dy = last_mean_now[1][0] - blob.mean[1]
+                too_large = last_blob.size > Identifier.THRESH_TARGET_SIZE or blob.size > Identifier.THRESH_TARGET_SIZE
 
                 # This is the shift between a pair of blobs
+                dx = last_mean_now[0][0] - blob.mean[0]
+                dy = last_mean_now[1][0] - blob.mean[1]
                 shift = float(np.sqrt(dx * dx + dy * dy))
+                # print blob_id, last_blob_id, shift
 
-                if shift < Identifier.THRESH_BLOB_STATIC:
-                    # print "STATIC:{},{}".format(blob_id, last_blob_id)
-                    # Below static threshold, so static blob
-                    obs.append(blob)
+                is_static = shift <= Identifier.THRESH_BLOB_STATIC
+                is_moving = Identifier.THRESH_BLOB_STATIC < shift <= Identifier.THRESH_BLOB_MOVEMENT
+                is_different = Identifier.THRESH_BLOB_MOVEMENT < shift
+
+                close_to_last_target = True
+                if self.last_target is not None:
+                    dtx = self.last_target[0] - blob.mean[0]
+                    dty = self.last_target[1] - blob.mean[1]
+                    close_to_last_target = np.sqrt(dtx * dtx + dty * dty) < 0.5
+
+                if is_different:
                     continue
-
-                elif shift < Identifier.THRESH_BLOB_MOVEMENT:
-                    # print "MOVING:{},{}".format(blob_id, last_blob_id)
-                    # Below moving threshold, so static blob
-                    if shift < shift_min_target:
-                        # print "TARGET:{},{}".format(blob_id, last_blob_id)
-                        target = blob
-                        shift_min_target = shift
-
-                # If above cases not applicable, these are two different blobs
+                if too_large:
+                    print "OBS:{},{}".format(blob_id, last_blob_id)
+                    obs.add(blob_id)
+                    continue
+                if not close_to_last_target:
+                    continue
+                if is_moving:
+                    print "TARGET:{},{}".format(blob_id, last_blob_id)
+                    target = blob
+                    continue
+                if is_static:
+                    print "STATIC:{},{}".format(blob_id, last_blob_id)
+                    target = blob
+                    pass
 
         # Save last blobs and target
         self.last_obs = copy.deepcopy(self.obs)
@@ -208,16 +228,19 @@ class Blob:
         self.id = id
         self.arr = None  # [coordinates of incident laser rays in bot frame]
         self.mean = None  # [mean coordinate in bot frame]
+        self.size = None  # [mean coordinate in bot frame]
 
     def add_point(self, point):
         if self.arr is None:
             self.arr = []
         self.arr.append(point)
 
-    def calculate_mean(self):
+    def calculate_mean_and_size(self, increment):
         if self.arr is not None:
             self.mean = (
                 sum([p[0] for p in self.arr]) / len(self.arr), sum([p[1] for p in self.arr]) / len(self.arr))
+            dist_mean = np.sqrt(self.mean[0] * self.mean[0] + self.mean[1] * self.mean[1])
+            self.size = increment * len(self.arr) * dist_mean
 
     def dist(self, blob2):
         dx = self.mean[0] - blob2.mean[0]
@@ -225,5 +248,7 @@ class Blob:
         return float(np.sqrt(dx * dx + dy * dy))
 
     def show(self):
-        return "{}:[{}]@({},{})".format(self.id, len(self.arr), follower_utils.show(self.mean[0], 1),
+        return "{}:[{}]@({},{})".format(self.id,
+                                        follower_utils.show(self.size),
+                                        follower_utils.show(self.mean[0], 1),
                                         follower_utils.show(self.mean[1], 1))

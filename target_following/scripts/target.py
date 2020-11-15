@@ -188,25 +188,34 @@ class Target:
 				self.pub.publish(self.vel_msg)
 				print "19"
 
-			if self.is_lost==1:
-				current_time = rospy.get_rostime()
-				#current_angle = self.angle 
-				#print current_time.to_sec()
-			while self.is_lost==1 and not rospy.is_shutdown():
-				self.vel_msg.angular.z = 0 #Target.ANGVELOCITY*1.5
-				self.vel_msg.linear.x = 0
+			# if self.is_lost==1:
+			# 	current_time = rospy.get_rostime()
+			# 	#current_angle = self.angle
+			# 	#print current_time.to_sec()
+			# while self.is_lost==1 and not rospy.is_shutdown():
+			# 	self.vel_msg.angular.z = 0 #Target.ANGVELOCITY*1.5
+			# 	self.vel_msg.linear.x = 0
+			# 	self.pub.publish(self.vel_msg)
+			# 	if self.is_lost==0:
+			# 		new_time = rospy.get_rostime()
+			# 		print new_time.to_sec()
+			# 		self.time_lost += current_time.to_sec() - new_time.to_sec()
+			# 		# print self.time_lost
+			# 		#while self.angle - current_angle > 0.2 or self.angle - current_angle < -0.2:
+			# 			#self.vel_msg.angular.z = Target.ANGVELOCITY*1.5
+			# 			#self.vel_msg.linear.x = 0
+			# 			#self.pub.publish(self.vel_msg)
+			# 		break
+
+	def move_fwd(self):
+		curr_time = rospy.get_rostime()
+		while not rospy.is_shutdown():
+			if rospy.get_rostime() - curr_time > rospy.Duration(1):
+				self.vel_msg = Twist()
+				self.vel_msg.linear.x = 0.1
 				self.pub.publish(self.vel_msg)
-				if self.is_lost==0:
-					new_time = rospy.get_rostime()
-					print new_time.to_sec()
-					self.time_lost += current_time.to_sec() - new_time.to_sec()
-					# print self.time_lost
-					#while self.angle - current_angle > 0.2 or self.angle - current_angle < -0.2:
-						#self.vel_msg.angular.z = Target.ANGVELOCITY*1.5
-						#self.vel_msg.linear.x = 0
-						#self.pub.publish(self.vel_msg)
-					break
-							
+
+
 
 	# class for the points on grid, copied from pa3 Archita
 class Node:
@@ -221,7 +230,7 @@ class Node:
 	def set_prev(self, other_node):
 		self.prev = other_node
 
-
 if __name__ == "__main__":
 	t = Target()
 	t.main()
+
