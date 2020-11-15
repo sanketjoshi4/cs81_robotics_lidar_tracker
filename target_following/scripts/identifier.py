@@ -7,6 +7,11 @@ import follower_utils
 
 
 class Identifier:
+    """ Rsponsible for using laser scan data to identify obstacles and moving entities """
+
+    SCAN_FREQ = 1.0  # Hz
+    ID_INIT_TIME = 3.0  # seconds before ID first detects the target
+
     # The minimum change in laser reading between adjacent angles, to consider them to be coming from different objects
     THRESH_RADIALLY_SEPARATE = 0.5
 
@@ -33,6 +38,7 @@ class Identifier:
     DIST_MAX_FAR = 20
 
     def __init__(self):  # All in the robot's frame of reference
+        """ Initializes the instance variables """
 
         self.blobs = {}  # dict of blob_id to Blob item
         self.target = None  # (x, y)
@@ -47,22 +53,25 @@ class Identifier:
         self.status = None  # Amongst
 
     def blobify(self, laser_scan_msg):
+        """ This updates the dict of blobs. Each blob is stored against a place holder id """
 
         amin = laser_scan_msg.angle_min  # Minimum angle of overall scan
         incr = laser_scan_msg.angle_increment  # Angle increment of overall scan
         arr = laser_scan_msg.ranges  # List of readings
 
+        # save blobs from last scan
         self.last_blobs = copy.deepcopy(self.blobs)
         self.blobs = {}
 
         blob_id = 0
 
-        # Create blobs
+        # identify blobs
         for idx, dist in enumerate(arr):
             angle = amin + incr * idx
             incident = (dist * np.cos(angle), dist * np.sin(angle))
 
             if idx == 0 or abs(dist - arr[idx - 1]) > Identifier.THRESH_RADIALLY_SEPARATE:
+                # means that it's two separate blobs
                 blob_id += 1
                 self.blobs[blob_id] = Blob(blob_id)
 
@@ -72,70 +81,63 @@ class Identifier:
         for blob_id, blob in self.blobs.items():
             blob.calculate_mean()
 
-        # Print blobs
-        # print [b.show() for b in self.blobs.values()]
+        print [b.show() for _, b in self.blobs.items()]
 
     def classify(self, movement_transform):
+        """ This is responsible for separating moving blobs from static ones. Saves the blob in motion as the target """
+
+        # TODO : In case of multiple moving objects, use target's last position as a weight in identifying the target
 
         # Pick out moving blobs
         obs = []
         target = None
         shift_min_target = 100
 
-        # print "\nBLOBS"
-        # print [b.show() for b in self.blobs.values()]
-        # print "\nLAST_BLOBS"
-        # print [b.show() for b in self.last_blobs.values()]
-
         for last_blob_id, last_blob in self.last_blobs.items():
+            # For every blob in last scan
 
             last_mean_now = movement_transform.getI().dot(
                 np.array([[last_blob.mean[0]], [last_blob.mean[1]], [0], [1]])
             )
 
             for blob_id, blob in self.blobs.items():
-
-                # if last_blob_id == blob_id:
-                #     print "\nBLOB_IDs : {}, {}".format(last_blob_id, blob_id)
-                #     print "Last : ({}, {})".format(follower_utils.show(last_mean_now[0][0]), follower_utils.show(last_mean_now[1][0]))
-                #     print "Blob : ({}, {})".format(follower_utils.show(blob.mean[0]), follower_utils.show(blob.mean[1]))
+                # Compare with every blob in current scan
 
                 dx = last_mean_now[0][0] - blob.mean[0]
                 dy = last_mean_now[1][0] - blob.mean[1]
+
+                # This is the shift between a pair of blobs
                 shift = float(np.sqrt(dx * dx + dy * dy))
 
                 if shift < Identifier.THRESH_BLOB_STATIC:
-
-                    # print "STATIC"
+                    print "STATIC:{},{}".format(blob_id, last_blob_id)
+                    # Below static threshold, so static blob
                     obs.append(blob)
-                    # print "obs id'd : {}".format(blob.show())
                     continue
 
                 elif shift < Identifier.THRESH_BLOB_MOVEMENT:
-
+                    print "MOVING:{},{}".format(blob_id, last_blob_id)
+                    # Below moving threshold, so static blob
                     if shift < shift_min_target:
+                        print "TARGET:{},{}".format(blob_id, last_blob_id)
                         target = blob
                         shift_min_target = shift
-                        # print "MOVE-NEW"
-                #     else:
-                #         print "MOVE-OLD"
-                # else:
-                #     print "NO MATCH"
 
+                # If above cases not applicable, these are two different blobs
+
+        # Save last blobs and target
         self.last_obs = copy.deepcopy(self.obs)
         self.last_target = copy.deepcopy(self.target)  # in base_scan ref
-        self.last_target_vel = copy.deepcopy(self.target_vel)  # in base_scan ref
+        # self.last_target_vel = copy.deepcopy(self.target_vel)  # in base_scan ref
 
+        # Update blobs and target
         self.obs = obs
-        self.target = target  # in base_scan ref
-        if self.target is not None and self.last_target is not None:
-            dx = self.target.mean[0] - self.last_target.mean[0]
-            dy = self.target.mean[1] - self.last_target.mean[1]
-            self.target_vel = (dx, dy)
-        else:
-            self.target_vel = None
+        self.target = target.mean if target is not None else None  # in base_scan ref
 
     def status(self):
+        """ This returns the FSM state given the target location w.r.t. robot """
+
+        # TODO : Distinguish between OOS and OOR
         if self.target is None:
             return Identifier.STATUS_ERR
         dist = float(np.sqrt(self.target[0] * self.target[0] + self.target[1] * self.target[1]))
@@ -146,10 +148,62 @@ class Identifier:
         if dist < Identifier.DIST_MAX_FAR:
             return Identifier.STATUS_FAR
         return Identifier.STATUS_OOR
-        # TODO : Distinguish between OOS and OOR
+
+    @staticmethod
+    def get_pos(target, robot_x, robot_y, robot_angle, trans_odom_to_map, frame):
+        if target is None:
+            return None
+
+        if frame == "BASE":
+            return target
+
+        # BASE to ODOM
+        sz, cz = np.sin(robot_angle), np.cos(robot_angle)
+        pos_odom = np.matrix(
+            [[cz, -sz, 0, robot_x], [sz, cz, 0, robot_y], [0, 0, 1, 0], [0, 0, 0, 1]]
+        ).dot(np.array([[target[0]], [target[1]], [0], [1]]))
+
+        if frame == "ODOM":
+            return float(pos_odom[0][0]), float(pos_odom[1][0])
+
+        pos_map = trans_odom_to_map.dot(pos_odom)
+        if frame == "MAP":
+            return float(pos_map[0][0]), float(pos_map[1][0])
+
+        return None
+
+    def get_target_pos_vel(self, robot, frame):
+        """ This returns the target position and velocity if identified, in the specified frame of reference """
+
+        if self.target is None:
+            return None, None
+
+        target_pos = Identifier.get_pos(
+            target=self.target,
+            robot_x=robot.posx, robot_y=robot.posy, robot_angle=robot.angle,
+            trans_odom_to_map=robot.mTo, frame=frame
+        )
+
+        last_target_pos = Identifier.get_pos(
+            target=self.last_target,
+            robot_x=robot.last_posx, robot_y=robot.last_posy, robot_angle=robot.last_angle,
+            trans_odom_to_map=robot.mTo, frame=frame
+        )
+
+        if self.last_target is None:
+            return target_pos, None
+
+        target_vel = (
+            (target_pos[0] - last_target_pos[0]) * Identifier.SCAN_FREQ,
+            (target_pos[1] - last_target_pos[1]) * Identifier.SCAN_FREQ
+        )
+
+        return target_pos, target_vel
 
 
 class Blob:
+    """ Encapsulated a blob identified by the ID """
+
     def __init__(self, id):
         self.id = id
         self.arr = None  # [coordinates of incident laser rays in bot frame]

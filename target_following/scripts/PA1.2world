@@ -23,9 +23,9 @@ interval_sim 10  # simulation timestep in milliseconds
 window
 (
   size [ 700 700 ]
-  center [ 5.000 5.000 ]
+  center [ 5.085 4.954 ]
   rotate [ 0.000 0.000 ]
-  scale 50.545
+  scale 67.275
 
   #show_data 1
 )
@@ -33,7 +33,7 @@ window
 floorplan
 (
   name "PA1"
-  bitmap "archipelago.png"
+  bitmap "maze.png"
   size [ 10.000 10.000 1.000 ]
   pose [ 5.000 5.000 0.000 0.000 ]
 )
@@ -41,7 +41,7 @@ floorplan
 # throw in a robot
 rosbot
 (
-  pose [ 3.000 5.000 0.000 0.000 ]
+  pose [ 5.000 5.000 0.000 180.000 ]
   name "rosbot"
   color "blue"
 )
@@ -49,7 +49,7 @@ rosbot
 # and another one
 rosbot
 (
-  pose [ 4.000 5.000 0.000 0.000 ]
+  pose [ 1.000 1.000 0.000 0.000 ]
   name "rosbot"
   color "green"
 )

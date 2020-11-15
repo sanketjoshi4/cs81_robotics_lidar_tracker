@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import numpy as np
+import math
 
 import follower_utils
 from recovery import Recovery
@@ -15,18 +16,13 @@ from nav_msgs.msg import OccupancyGrid, Odometry
 from std_msgs.msg import Bool
 from sensor_msgs.msg import LaserScan
 
-FREQ = 10  # Hz
-SLEEP = 2
+CMD_FREQ = 10  # Hz
+SLEEP = 2  # secs
 VEL = 0.1  # m/s
 
-SCAN_FREQ = 1  # Hz
-
 PI = np.pi
-LASER_RANGE = 20.0
 
-BASE_LINEAR_VELOCITY = 1.0
-BASE_ANGULAR_VELOCITY = PI / 2
-
+# TODO : Figure out a better way to code robot's start pose .. env vars?
 START_X_MAP = 3.0  # Would change as per the map
 START_Y_MAP = 5.0  # Would change as per the map
 
@@ -39,7 +35,7 @@ class Robot:
         rospy.init_node("robot")  # feel free to rename
         self.pub = rospy.Publisher("robot_0/cmd_vel", Twist, queue_size=0)
         self.stat_pub = rospy.Publisher("visible_status", Bool, queue_size=0)  # latest one only
-        self.world_sub = rospy.Subscriber("map", OccupancyGrid, self.world_callback, queue_size=1)
+        self.world_sub = rospy.Subscriber("map", OccupancyGrid, self.map_callback, queue_size=1)
         self.odom_sub = rospy.Subscriber("robot_0/odom", Odometry, self.odom_callback)
         self.sub_laser = rospy.Subscriber("robot_0/base_scan", LaserScan, self.laser_scan_callback, queue_size=1)
         self.map = None
@@ -58,10 +54,12 @@ class Robot:
         self.bTo = None  # odom to base_link
         self.world = None  # if we do not use world in here, delete this later
 
+        self.rcvr_poses = []  # all poses to move to in order to get to last detected target pose
         self.lis = tf.TransformListener()
         self.rcvr = None
         self.id = Identifier()
         self.time_last_scan = None
+        self.target_ever_found = False
 
         rospy.sleep(SLEEP)
 
@@ -74,18 +72,13 @@ class Robot:
             [msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z,
              msg.pose.pose.orientation.w])
         self.angle = yaw
-        # TEST CODE for visible_status pub
+
+    # TEST CODE for visible_status pub
 
     def pub_visibility(self, visible):
         msg = Bool()
         msg.data = visible  # expect boolean
         self.stat_pub.publish(msg)
-
-    def world_callback(self, msg):
-        print("loading map")
-        self.world = World(msg.data, msg.info.width, msg.info.height, msg.info.resolution, msg.header.frame_id,
-                           msg.info.origin)
-        self.rcvr = Recovery(self.world)
 
     def get_transform(self):
         # get transformation from odom to base_link
@@ -96,40 +89,242 @@ class Robot:
         self.bTo = t.dot(r)
 
     def map_callback(self, msg):
-        print("loading map")
-        self.map = World(msg.data, msg.info.width, msg.info.height, msg.info.resolution, msg.header.frame_id,
-                         msg.info.origin)
-        self.rcvr = Recovery(self.map)
-        print(self.map.T)
+	if self.map is None:
+            print("loading map")
+	    self.map = World(msg.data, msg.info.width, msg.info.height, msg.info.resolution, msg.header.frame_id,
+				 msg.info.origin)
+            print(self.map.T)
 
     def laser_scan_callback(self, laser_scan_msg):
+        """ Uses laser scan to update target position """
 
         curr_time = rospy.get_time()
-        if self.time_last_scan is None or (curr_time - self.time_last_scan > 1 / SCAN_FREQ):
-            print "{}".format(''.join(['-' for _ in range(100)]))
+        if self.time_last_scan is None or (curr_time - self.time_last_scan > 1 / Identifier.SCAN_FREQ):
+            # Scan based on SCAN_FREQ
 
-            # print "Pose: ({}, {}, {})".format(show(self.posx), show(self.posy), show(self.angle))
-            # print "LPos: ({}, {}, {})".format(show(self.last_posx), show(self.last_posy), show(self.last_angle))
             if self.posx is not None and self.last_posx is not None:
-                self.id.blobify(laser_scan_msg)
-                self.id.classify(self.get_movement_transform())
+                self.id.blobify(laser_scan_msg)  # Identify blobs
+                self.id.classify(self.get_movement_transform())  # Classify blobs, set target
 
+            # Update last pose to current
             self.last_posx = self.posx
             self.last_posy = self.posy
             self.last_angle = self.angle
             self.time_last_scan = curr_time
 
-            target_pos = self.get_target_pos(frame="ODOM")
-            # print "Robot  @ ({}, {})".format(show(self.posx), show(self.posy))
-            if target_pos is not None:
-                print "Target @ ({},{})".format(follower_utils.show(target_pos[0]), follower_utils.show(target_pos[1]))
-            else:
-                print "TARGET: Not found"
+    def update_rcvr(self):
+        # update recovery with robot's current pose
+        self.get_transform()  # update self.bTo first
+        p = self.mTo.dot(np.transpose(np.array([self.posx, self.posy, 0, 1])))[0:2]
+        self.rcvr.robot_pos = Point()
+        self.rcvr.robot_pos.x = p[0]
+        self.rcvr.robot_pos.y = p[1]
+
+    def display_target_status(self, tpos, tvel):
+        if not self.target_ever_found:
+            return
+
+        print "{}".format(''.join(['-' for _ in range(100)]))
+        if tpos is not None:
+            print "Target Pos : ({},{})".format(
+                follower_utils.show(tpos[0]), follower_utils.show(tpos[1]))
+            if tvel is not None:
+                print "Target Vel : ({},{})".format(
+                    follower_utils.show(tvel[0]), follower_utils.show(tvel[1]))
+        else:
+            print "Target Lost"
 
     def move(self):
-        # TODO: add actual logic to this function
-        # TODO: get predicted x and z velocities from Predictor, combine with Identifier info to calculate move
-        pass
+        self.rcvr = Recovery(self.map)
+
+        rate = rospy.Rate(CMD_FREQ)
+        vel_msg = Twist()
+        print "Searching for target..."
+
+        start_time = rospy.get_time()
+
+        while not rospy.is_shutdown():
+            lin_x = 0
+            ang_z = 0
+
+            tpos, tvel = self.id.get_target_pos_vel(robot=self, frame="ODOM")
+            self.target_ever_found = self.target_ever_found or tpos is not None
+            self.display_target_status(tpos, tvel)
+
+            # we detect target so decide how to move using PID-like function
+            if tpos is not None and tvel is not None:
+
+                self.pub_visibility(True)  # can see the target
+                (lin_x, ang_z) = self.chase(tpos, tvel)
+
+                # recovery object will always have last known target pose to prepare for recovery mode
+                tpos_map, tvel_map = self.id.get_target_pos_vel(robot=self, frame="MAP")
+                self.rcvr.last_known_pos = Point()
+                self.rcvr.last_known_pos.x = tpos_map[0]
+                self.rcvr.last_known_pos.y = tpos_map[1]
+
+                # clear poses for recovery when re-entering regular mode
+                if self.rcvr_poses:
+                    self.rcvr_poses = []
+
+            elif rospy.get_time() - start_time < Identifier.ID_INIT_TIME:
+                continue
+
+            elif not self.target_ever_found:
+                continue
+
+            # elif self.rcvr is not None:  # target is out of sight, go into recovery mode
+            else:  # target is out of sight, go into recovery mode
+
+                # print "In Recovery : {}".format(self.rcvr_poses)
+                self.pub_visibility(False)  # cant see the target
+
+                if not self.rcvr_poses:
+                    # we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
+                    self.update_rcvr()  # remember to update Recovery object's required info first
+                    self.rcvr_poses = self.rcvr.recover()
+                # print("retrieved rcvr_poses", self.rcvr_poses)
+
+                # in the middle of recovery mode
+                # separate if statement so we don't have to wait until next loop iteration to start moving once entered recovery mode
+                if self.rcvr_poses:
+                    # essentially we are moving to every position from a list that goes [[goalx, goaly], ..., [startx, starty]], if we encounter
+                    # target before we finish this list i.e. state changes back to REGULAR, just clear list to prep for next recovery call
+                    pose = self.rcvr_poses[-1]
+
+                    # transform user-given point in odom to base_link, assume ROBOT CAN'T FLY
+                    self.get_transform()
+                    v = np.linalg.inv(self.mTo).dot(np.transpose(np.array([pose[0], pose[1], 0, 1])))
+                    v = self.bTo.dot(v)
+                    v = v[0:2]  # only need x,y because of assumption above
+                    # remaining angle to turn i.e. angle btwn x-axis vector and vector of x,y above
+                    ang = np.arctan2(v[1], v[0])
+                    if -0.025 <= ang <= 0.025:
+                        # turn finished so start moving in lin x only, if applicable
+                        ang_z = 0
+                        # remaining euclidean distance to travel, assume no movement in z-axis
+                        dis = np.linalg.norm(np.array([0, 0]) - v)
+                        if -0.025 <= dis <= 0.025:
+                            # lin x move finished, pop this pose
+                            self.rcvr_poses.pop()
+                            continue  # no need to waste a publication
+                        else:
+                            lin_x = VEL  # rotation ensures we always move forward
+                    else:
+                        lin_x = 0
+                        if ang < 0:
+                            ang_z = -VEL
+                        else:  # can only be positive, near 0 is rounded to 0 and handled above
+                            ang_z = VEL
+
+            vel_msg.linear.x = lin_x
+            vel_msg.angular.z = ang_z
+            self.pub.publish(vel_msg)
+            rate.sleep()
+
+    def chase(self, tpos, tvel):
+        lin_x = 0.1
+        ang_z = 0.0
+
+        rpx = self.posx  # robot pos x
+        rpy = self.posy  # robot pos y
+        rpz = self.angle  # robot angle
+
+        rvx = (self.posx - self.last_posx) * Identifier.SCAN_FREQ  # robot vel x
+        rvy = (self.posy - self.last_posy) * Identifier.SCAN_FREQ  # robot vel y
+        rvz = (self.angle - self.last_angle) * Identifier.SCAN_FREQ  # robot ang vel
+
+        tpx = tpos[0]  # target pos x
+        tpy = tpos[1]  # target pos y
+
+        tvx = tvel[0]  # target vel x
+        tvy = tvel[1]  # target vel y
+
+        obs = self.id.obs
+
+        # print "RP:{},{},{}".format(follower_utils.show(rpx), follower_utils.show(rpy), follower_utils.show(rpz))
+        # print "RV:{},{},{}".format(follower_utils.show(rvx), follower_utils.show(rvy), follower_utils.show(rvz))
+        # print "TP:{},{}".format(follower_utils.show(tpx), follower_utils.show(tpy))
+        # print "TV:{},{}".format(follower_utils.show(tvx), follower_utils.show(tvy))
+
+        if self.id.target is not None:
+            print "PID-TargetY:", self.id.target[1]
+            ang_z = self.id.target[1] * 0.2 if self.id.target is not None else 0
+
+        dist = math.sqrt((rpx - tpx) * (rpx - tpx) + (rpy - tpy) * (rpy - tpy))
+        if dist < 0.3:
+            lin_x = 0
+
+        """
+        speed,  angle_of_pid <- pid_like(rp, rv, tp, tv)
+        if not obs @ angle_of_pid:
+            return angle_of_pid
+        angle_left <- search left
+        angle_right <- search left
+        angle_of_tangent <- min (a_L,a_R)
+        angle_wiggle <- angle + get_wiggle() # angle diff in robot and target vels
+        return angle_of_pid + angle_wiggle
+        """
+
+        # (angle, vel_tuple) = self.pid_like((rpx, rpy), (rvx, rvy), (tpx, tpy), (tvx, tvy))
+
+        return lin_x, ang_z
+
+    def pid_like(self, rp, rv, tp, tv):
+        """
+            pid_like :: (rp, rv, tp, tv) -> angle
+            split into x and y
+            consider from the target's frame of ref
+            get the dx and dy
+            convert back to robot's frame
+        """
+        # getting individual components, assuming rv and tv are tuples (rv is robot velocity, tv is predicted target velocity)
+        xrv = rv[0]
+        yrv = rv[1]
+        xtv = tv[0]
+        ytv = tv[1]
+        # rp is robot position, tp is target position
+        xrp = rp[0]
+        yrp = rp[1]
+        xtp = tp[0]
+        ytp = tp[1]
+        # direct velocity
+        diff_x = xtp - xrp
+        diff_y = ytp - yrp
+        # normalizing difference, this produces the direct velocity to the target from the robot (aka, this produces
+        # a normalized velocity in the direction of the target's current position from the robot's current position)
+        direct_velx = diff_x / (math.pow(diff_x, 2) + math.pow(diff_y, 2))
+        direct_vely = diff_y / (math.pow(diff_x, 2) + math.pow(diff_y, 2))
+
+        # averaging the direct velocities and the predicted velocities
+        robot_velx = (xtv + direct_velx) / 2
+        robot_vely = (ytv + direct_vely) / 2
+        vel_tuple = (robot_velx, robot_vely)
+        angle = math.atan2(robot_vely, robot_velx)
+        return (angle, vel_tuple)
+
+    def get_wiggle(self, rv, tv):
+        """
+            get_wiggle :: -> (rv, tv) angle
+            wiggle_angle <- angle_btwn(rv,tv)
+            return wiggle angle
+        """
+        # getting individual components, assuming rv and tv are tuples (rv is robot velocity, tv is target velocity)
+        xrv = rv[0]
+        yrv = rv[1]
+        xtv = tv[0]
+        ytv = tv[1]
+        # taking dot product
+        dot = np.dot([xrv, yrv], [xtv, ytv])
+
+        # getting lengths of both vectors
+        lenrv = math.pow(xrv * xrv + yrv * yrv, 0.5)
+        lentv = math.pow(xtv * xtv + ytv * ytv, 0.5)
+        # getting angle between
+        angle = math.acos(dot / (lenrv * lentv))
+
+        # returning the angle between the two vector
+        return angle
 
     def get_movement_transform(self):
 
@@ -143,99 +338,8 @@ class Robot:
 
         return mat2.getI().dot(mat1)
 
-    def simple_main(self):
-        print(self.posx, self.posy, self.angle)
-        vel_msg = Twist()
-        rate = rospy.Rate(FREQ)
-        start_time = rospy.get_rostime()
-
-        while not rospy.is_shutdown() and rospy.get_rostime() - start_time < rospy.Duration(100):
-            vel_msg.angular.z = 0
-            vel_msg.linear.x = VEL
-            self.pub.publish(vel_msg)
-            rate.sleep()
-
-    def get_target_pos(self, frame):
-
-        if self.id.target is None:
-            return None
-
-        sz, cz = np.sin(self.angle), np.cos(self.angle)
-
-        x_base_scan, y_base_scan = self.id.target.mean[0], self.id.target.mean[1]
-        pos_base_scan = np.array([[x_base_scan], [y_base_scan], [0], [1]])
-        if frame == "BASE":
-            return float(pos_base_scan[0][0]), float(pos_base_scan[1][0])
-        # print "BASE : {}".format(follower_utils.show_pos(pos_base_scan))
-
-        trans_base_scan_to_odom = np.matrix(
-            [[cz, -sz, 0, self.posx], [sz, cz, 0, self.posy], [0, 0, 1, 0], [0, 0, 0, 1]])
-        pos_odom = trans_base_scan_to_odom.dot(pos_base_scan)
-        if frame == "ODOM":
-            return float(pos_odom[0][0]), float(pos_odom[1][0])
-        # print "ODOM : {}".format(follower_utils.show_pos(pos_odom))
-
-        trans_odom_to_map = self.mTo
-        pos_map = trans_odom_to_map.dot(pos_odom)
-        if frame == "MAP":
-            return float(pos_map[0][0]), float(pos_map[1][0])
-        # print "MAP  : {}".format(follower_utils.show_pos(pos_map))
-
-        return None
-
-    def main(self):
-        print("in main")
-        while self.rcvr is None:
-            continue
-        self.rcvr.robot_pos = Point()
-        p = self.mTo.dot(np.transpose(np.array([0, 0, 0, 1])))[0:2]
-        self.rcvr.robot_pos.x = p[0]
-        self.rcvr.robot_pos.y = p[1]
-        print(p)
-        print('---')
-        print(self.posx, self.posy, self.angle)
-        vel_msg = Twist()
-        rate = rospy.Rate(FREQ)
-        poses = self.rcvr.predict()  # expect [[x,y],[x,y],...]
-        print(poses)
-        for pose in poses:
-            # transform user-given point in odom to base_link, assume ROBOT CAN'T FLY
-            self.get_transform()
-            v = np.linalg.inv(self.mTo).dot(np.transpose(np.array([pose[0], pose[1], 0, 1])))
-            v = self.bTo.dot(v)
-            v = v[0:2]  # only need x,y because of assumption above
-            print(v)
-            # angle to turn i.e. angle btwn x-axis vector and vector of x,y above
-            a = np.arctan2(v[1], v[0])
-            # euclidean distance to travel, assume no movement in z-axis
-            l = np.linalg.norm(np.array([0, 0]) - v)
-            start_time = rospy.get_rostime()
-            if a >= 0:  # anticlockwise rot (or no rot)
-                start_time = rospy.get_rostime()
-                while not rospy.is_shutdown() and rospy.get_rostime() - start_time < rospy.Duration(a / VEL):
-                    vel_msg.angular.z = VEL
-                    vel_msg.linear.x = 0
-                    self.pub.publish(vel_msg)
-                    rate.sleep()
-            else:
-                start_time = rospy.get_rostime()
-                while not rospy.is_shutdown() and rospy.get_rostime() - start_time < rospy.Duration(-a / VEL):
-                    vel_msg.angular.z = -VEL
-                    vel_msg.linear.x = 0
-                    self.pub.publish(vel_msg)
-                    rate.sleep()
-            start_time = rospy.get_rostime()
-            while not rospy.is_shutdown() and rospy.get_rostime() - start_time < rospy.Duration(l / VEL):
-                vel_msg.angular.z = 0
-                vel_msg.linear.x = VEL
-                self.pub.publish(vel_msg)
-                rate.sleep()
-        print(self.posx, self.posy, self.angle)
-        self.pub_visibility(True)
-        self.pub_visibility(False)
-
 
 if __name__ == "__main__":
     # we'll probably set up target like this from main.py?
     r = Robot()
-    r.simple_main()
+    r.move()

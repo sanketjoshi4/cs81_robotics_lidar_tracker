@@ -1,5 +1,6 @@
 from geometry_msgs.msg import Point
 from cell import Cell
+import follower_utils
 from world import World
 import heapq as hq
 
@@ -28,6 +29,8 @@ class Recovery:
 		# full knowledge of world
 		self.world = world
 
+		print("init done")
+
 	def recover(self):
 		"""
 		Returns a list of poses in map frame that robot needs to be in, in order to move to last_known_pos
@@ -36,6 +39,8 @@ class Recovery:
 		# assume in map frame
 		self.end = [self.last_known_pos.x, self.last_known_pos.y]
 		self.start = [self.robot_pos.x, self.robot_pos.y]
+		print("finding path from ", (follower_utils.show(self.start[0]),follower_utils.show(self.start[1])), "to ",
+			  (follower_utils.show(self.end[0]),follower_utils.show(self.end[1])))
 
 		# convert from map to grid; theta doesn't matter here
 		start_grid_x, start_grid_y, theta = self.world.map_to_grid(self.start[0], self.start[1], 0)
@@ -44,6 +49,9 @@ class Recovery:
 		# convert from grid to cell
 		start_cell_x, start_cell_y = self.world.grid_to_cell(start_grid_x, start_grid_y)
 		end_cell_x, end_cell_y = self.world.grid_to_cell(end_grid_x, end_grid_y)
+
+		print(start_cell_x, start_cell_y)
+		print(end_cell_x, end_cell_y)
 
 		self.start = [start_cell_x, start_cell_y]
 		self.end = [end_cell_x, end_cell_y]
@@ -85,14 +93,11 @@ class Recovery:
 
 			# we've found goal, back trace and return
 			if curr == goal:
-				print("found")
 				path = []
 				while curr in closed_set:
 					path.append(curr)
 					curr = closed_set[curr]
-				#path.append(curr)
-				path.reverse()
-				return path # [start, a, b, c, ..., goal]
+				return path # [goal, ..., c, b, a] reversed so we can pop() later
 
 			# look at all neighbors in y dir
 			cx = curr.coords[0]
