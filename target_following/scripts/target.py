@@ -97,121 +97,122 @@ class Target:
         while self.done == 0 and not rospy.is_shutdown():
             # from Josephine's previous commit
 
-            while rospy.get_rostime() - beginning_time < rospy.Duration(7):
+            while rospy.get_rostime() - beginning_time < rospy.Duration(7) and not rospy.is_shutdown():
                 self.curve_left(0)
                 self.pub.publish(self.vel_msg)
                 print "1"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(9):
+            while rospy.get_rostime() - beginning_time < rospy.Duration(9) and not rospy.is_shutdown():
                 self.straight()
                 self.pub.publish(self.vel_msg)
                 print "2"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(3.75):
+            while rospy.get_rostime() - beginning_time < rospy.Duration(3.75) and not rospy.is_shutdown():
                 self.curve_left(0)
                 self.pub.publish(self.vel_msg)
                 print "3"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(8.75):
+            while rospy.get_rostime() - beginning_time < rospy.Duration(8.75) and not rospy.is_shutdown():
                 self.curve_right(1)
                 self.pub.publish(self.vel_msg)
                 print "4"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(12.5):
+            while rospy.get_rostime() - beginning_time < rospy.Duration(12.5) and not rospy.is_shutdown():
                 self.straight()
                 self.pub.publish(self.vel_msg)
                 print "5"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(8):
+            while rospy.get_rostime() - beginning_time < rospy.Duration(8) and not rospy.is_shutdown():
                 self.curve_right(0)
                 self.pub.publish(self.vel_msg)
                 print "6"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(12):
+            while rospy.get_rostime() - beginning_time < rospy.Duration(12) and not rospy.is_shutdown():
                 self.straight()
                 self.pub.publish(self.vel_msg)
                 print "7"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(8):
+            while rospy.get_rostime() - beginning_time < rospy.Duration(8) and not rospy.is_shutdown():
                 self.curve_right(0)
                 self.pub.publish(self.vel_msg)
                 print "8"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(10):
+            while rospy.get_rostime() - beginning_time < rospy.Duration(10) and not rospy.is_shutdown():
                 self.straight()
                 self.pub.publish(self.vel_msg)
                 print "9"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(9.5):
+            while rospy.get_rostime() - beginning_time < rospy.Duration(10.5) and not rospy.is_shutdown():
                 self.curve_left(0)
                 self.pub.publish(self.vel_msg)
                 print "10"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(11.5):
+            while rospy.get_rostime() - beginning_time < rospy.Duration(10) and not rospy.is_shutdown():
                 self.straight()
                 self.pub.publish(self.vel_msg)
                 print "11"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(8):
+            while rospy.get_rostime() - beginning_time < rospy.Duration(9.75) and not rospy.is_shutdown():
                 self.curve_right(0)
                 self.pub.publish(self.vel_msg)
                 print "12"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(9.5):
+            while rospy.get_rostime() - beginning_time < rospy.Duration(13) and not rospy.is_shutdown():
                 self.straight()
                 self.pub.publish(self.vel_msg)
                 print "13"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(9):
+            while rospy.get_rostime() - beginning_time < rospy.Duration(9) and not rospy.is_shutdown():
                 self.curve_right(0)
                 self.pub.publish(self.vel_msg)
                 print "14"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(9):
+            while rospy.get_rostime() - beginning_time < rospy.Duration(9) and not rospy.is_shutdown():
                 self.straight()
                 self.pub.publish(self.vel_msg)
                 print "15"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(6):
+            while rospy.get_rostime() - beginning_time < rospy.Duration(6) and not rospy.is_shutdown():
                 self.curve_right(0)
                 self.pub.publish(self.vel_msg)
                 print "16"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(3):
-                self.straight()
+            while rospy.get_rostime() - beginning_time < rospy.Duration(4) and not rospy.is_shutdown():
+                self.curve_left(0)
                 self.pub.publish(self.vel_msg)
                 print "17"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(3):
-                self.curve_left(0)
+            while rospy.get_rostime() - beginning_time < rospy.Duration(4) and not rospy.is_shutdown():
+                self.curve_right(1)
                 self.pub.publish(self.vel_msg)
                 print "18"
 
             beginning_time = rospy.get_rostime()
-            while rospy.get_rostime() - beginning_time < rospy.Duration(3):
-                self.curve_right(1)
+            while rospy.get_rostime() - beginning_time < rospy.Duration(1) and not rospy.is_shutdown():
+                self.straight()
                 self.pub.publish(self.vel_msg)
                 print "19"
 
-
 # class for the points on grid, copied from pa3 Archita
+
+
 class Node:
     # initializing basic values of the node
     def __init__(self, x, y, grid, goalx, goaly):
