@@ -160,7 +160,7 @@ class Robot:
             # self.display_target_status(tpos, tvel)
 
             # we detect target so decide how to move using PID-like function
-            if tpos is not None and tvel is not None:
+            if False and tpos is not None and tvel is not None:
 
                 self.pub_visibility(True)  # can see the target
                 lin_x, ang_z = self.chase(tpos, tvel)
@@ -175,11 +175,11 @@ class Robot:
                 if self.rcvr_poses:
                     self.rcvr_poses = []
 
-            elif rospy.get_time() - start_time < Identifier.ID_INIT_TIME:
+            elif False and rospy.get_time() - start_time < Identifier.ID_INIT_TIME:
                 self.pub_visibility(True)
                 continue
 
-            elif not self.target_ever_found:
+            elif False and not self.target_ever_found:
                 self.pub_visibility(True)
                 continue
 
@@ -194,7 +194,7 @@ class Robot:
                     # we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
                     self.update_rcvr()  # remember to update Recovery object's required info first
                     self.rcvr_poses = self.rcvr.recover()
-                # print("retrieved rcvr_poses", self.rcvr_poses)
+                print("retrieved rcvr_poses", self.rcvr_poses)
 
                 # in the middle of recovery mode
                 # separate if statement so we don't have to wait until next loop iteration to start moving once entered recovery mode

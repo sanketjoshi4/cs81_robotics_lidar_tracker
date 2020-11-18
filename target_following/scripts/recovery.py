@@ -7,7 +7,7 @@ import heapq as hq
 
 LOST_THRESH = 10 # s
 EDGE_WEIGHT = 1 # constant edge weight because everything is 1 grid square away from us, may change this
-SEARCH_RANGE = 10 # grid squares
+SEARCH_RANGE = 5 # grid squares
 
 
 class Recovery:
@@ -18,8 +18,8 @@ class Recovery:
 
         # last known pose of target; right now hard-coded, but later Robot should pass this pose to Recovery object
         self.last_known_pos = Point()
-        self.last_known_pos.x = 4.5
-        self.last_known_pos.y = 4.5
+        self.last_known_pos.x = 2.17
+        self.last_known_pos.y = 4.6
 
         # robot's current pose (pose at which we adopt recovery mode)
         self.robot_pos = None
@@ -51,6 +51,12 @@ class Recovery:
         start_cell_x, start_cell_y = self.world.grid_to_cell(start_grid_x, start_grid_y)
         end_cell_x, end_cell_y = self.world.grid_to_cell(end_grid_x, end_grid_y)
 
+        if self.is_near_obs(end_cell_x, end_cell_y):
+            end_cell_x, end_cell_y = self.get_nearest_free(end_cell_x, end_cell_y)
+            if end_cell_x == -1:
+                print("error getting nearest free cell")
+                return []
+
         print(start_cell_x, start_cell_y)
         print(end_cell_x, end_cell_y)
 
@@ -59,14 +65,28 @@ class Recovery:
 
         # check coords are actually on grid
         if not self.world.on_grid(start_cell_x, start_cell_y) or not self.world.on_grid(end_cell_x, end_cell_y):
-                return []
+            print("not on grid")
+            return []
         # if start or end coordinates have obstacle in them, then it's bad input
         if self.world.get_cell(start_cell_x, start_cell_y) or self.world.get_cell(end_cell_x, end_cell_y):
-                return []
+            print("inside obstacle")
+            return []
 
         path = self.a_star()
         return self.get_path_poses(path)
-    
+
+    def get_nearest_free(self, x, y):
+        """
+        Returns the nearest cell index x,y that's not within SEARCH_RANGE of an obstacle
+        """
+        for ny in range(y - SEARCH_RANGE, y + SEARCH_RANGE * 2 + 1):
+            for nx in range(x - SEARCH_RANGE, x + SEARCH_RANGE * 2 + 1):
+                if ny != y or nx != x:
+                    if not self.is_near_obs(nx, ny):
+                        return nx, ny
+
+        return -1, -1
+
     def diagonal(self, curr_x, curr_y):
         """
         Returns diagonal distance from curr_x,curr_y to self.end[0],self.end[1]--BOTH IN CELL COORDS
@@ -95,38 +115,39 @@ class Recovery:
         g_vals[start] = 0
 
         while len(open_set) > 0:
-                # get next lowest in open set; 1st index is Cell obj because 0th index is diagonal
-                curr = hq.heappop(open_set)[1]
+            # get next lowest in open set; 1st index is Cell obj because 0th index is diagonal
+            curr = hq.heappop(open_set)[1]
 
-                # we've found goal, back trace and return
-                if curr == goal:
-                        path = []
-                        while curr in closed_set:
-                                path.append(curr)
-                                curr = closed_set[curr]
-                        return path # [goal, ..., c, b, a] reversed so we can pop() later
+            # we've found goal, back trace and return
+            if curr == goal:
+                print("found")
+                path = []
+                while curr in closed_set:
+                        path.append(curr)
+                        curr = closed_set[curr]
+                return path # [goal, ..., c, b, a] reversed so we can pop() later
 
-                # look at all neighbors in y dir
-                cx = curr.coords[0]
-                cy = curr.coords[1]
-                for ny in range(max(0, cy - 1), min(cy + 2, self.world.height)):
-                        for nx in range(max(0, cx - 1), min(cx + 2, self.world.width)):
-                                # if not current cell and doesn't have obstacle
-                                if (cy != ny or cx != nx) and not self.world.get_cell(cx, ny):
-                                        n = Cell([nx, ny])
-                                        temp_g = g_vals[curr] + EDGE_WEIGHT
-                                        # if cost from start to n is lowest so far, or no cost calculated yet
-                                        if (n in g_vals and temp_g < g_vals[n]) or (n not in g_vals):
-                                                closed_set[n] = curr # update shortest path to n
-                                                g_vals[n] = temp_g
-                                                temp_f = g_vals[n] + self.diagonal(cx, ny)
-                                                for i in range(len(open_set)):
-                                                        # remove n from open set if already there
-                                                        if open_set[i][1] == n:
-                                                                del open_set[i]
-                                                                break
-                                                hq.heappush(open_set, (temp_f, n))
-                                                hq.heapify(open_set)
+            # look at all neighbors in y dir
+            cx = curr.coords[0]
+            cy = curr.coords[1]
+            for ny in range(max(0, cy - 1), min(cy + 2, self.world.height)):
+                for nx in range(max(0, cx - 1), min(cx + 2, self.world.width)):
+                    # if not current cell and doesn't have obstacle
+                    if (cy != ny or cx != nx) and not self.world.get_cell(nx, ny) and not self.is_near_obs(nx, ny):
+                        n = Cell([nx, ny])
+                        temp_g = g_vals[curr] + EDGE_WEIGHT
+                        # if cost from start to n is lowest so far, or no cost calculated yet
+                        if (n in g_vals and temp_g < g_vals[n]) or (n not in g_vals):
+                            closed_set[n] = curr # update shortest path to n
+                            g_vals[n] = temp_g
+                            temp_f = g_vals[n] + self.diagonal(nx, ny)
+                            for i in range(len(open_set)):
+                                # remove n from open set if already there
+                                if open_set[i][1] == n:
+                                    del open_set[i]
+                                    break
+                            hq.heappush(open_set, (temp_f, n))
+                            hq.heapify(open_set)
 
         return []
 
@@ -134,8 +155,13 @@ class Recovery:
         """
         Check if cell index at x,y is near a rock, to take into account of robot size in map
         """
-        near = False
-        for
+        for ny in range(y - SEARCH_RANGE, y + SEARCH_RANGE + 1):
+            for nx in range(x - SEARCH_RANGE, x + SEARCH_RANGE + 1):
+                if nx != x or ny != y:
+                    if self.world.get_cell(nx, ny): # has obstacle
+                        return True
+        return False
+                    
 
     def get_path_poses(self, path):
         """
@@ -147,13 +173,13 @@ class Recovery:
         poses = []
 
         for i in range(len(path)):
-                cx = path[i].coords[0]
-                cy = path[i].coords[1]
+            cx = path[i].coords[0]
+            cy = path[i].coords[1]
 
-                # get x,y in grid
-                grid_x, grid_y = self.world.cell_to_grid(cx, cy)
+            # get x,y in grid
+            grid_x, grid_y = self.world.cell_to_grid(cx, cy)
 
-                # get x,y in map; yaw doesn't matter
-                map_x, map_y, map_yaw = self.world.grid_to_map(grid_x, grid_y, 0)
-                poses.append([map_x, map_y])
+            # get x,y in map; yaw doesn't matter
+            map_x, map_y, map_yaw = self.world.grid_to_map(grid_x, grid_y, 0)
+            poses.append([map_x, map_y])
         return poses
