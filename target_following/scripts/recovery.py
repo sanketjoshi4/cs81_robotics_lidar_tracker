@@ -19,8 +19,8 @@ class Recovery:
 
         # last known pose of target; right now hard-coded, but later Robot should pass this pose to Recovery object
         self.last_known_pos = Point()
-        self.last_known_pos.x = 4
-        self.last_known_pos.y = 5
+        self.last_known_pos.x = 2.5
+        self.last_known_pos.y = 6.3
 
         # robot's current pose (pose at which we adopt recovery mode)
         self.robot_pos = None
@@ -81,8 +81,8 @@ class Recovery:
         """
         Returns the nearest cell index x,y that's not within SEARCH_RANGE of an obstacle
         """
-        for ny in range(y - SEARCH_RANGE, y + SEARCH_RANGE * 2 + 1):
-            for nx in range(x - SEARCH_RANGE, x + SEARCH_RANGE * 2 + 1):
+        for ny in range(y - SEARCH_RANGE * 2, y + SEARCH_RANGE * 2 + 1):
+            for nx in range(x - SEARCH_RANGE * 2, x + SEARCH_RANGE * 2 + 1):
                 if ny != y or nx != x:
                     if not self.is_near_obs(nx, ny):
                         return nx, ny

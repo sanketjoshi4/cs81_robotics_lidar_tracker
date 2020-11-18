@@ -212,12 +212,12 @@ class Robot:
                     v = v[0:2]  # only need x,y because of assumption above
                     # remaining angle to turn i.e. angle btwn x-axis vector and vector of x,y above
                     ang = np.arctan2(v[1], v[0])
-                    if -0.025 <= ang <= 0.025:
+                    if -0.05 <= ang <= 0.05:
                         # turn finished so start moving in lin x only, if applicable
                         ang_z = 0
                         # remaining euclidean distance to travel, assume no movement in z-axis
                         dis = np.linalg.norm(np.array([0, 0]) - v)
-                        if -0.025 <= dis <= 0.025:
+                        if -0.05 <= dis <= 0.05:
                             # lin x move finished, pop this pose
                             self.rcvr_poses.pop()
                             continue  # no need to waste a publication
