@@ -25,6 +25,7 @@ PI = np.pi
 # TODO : Figure out a better way to code robot's start pose .. env vars?
 START_X_MAP = 3.0  # Would change as per the map
 START_Y_MAP = 5.0  # Would change as per the map
+START_YAW_MAP = 0
 
 
 # START_Z_MAP = 0.0
@@ -127,6 +128,7 @@ class Robot:
         self.rcvr.robot_pos = Point()
         self.rcvr.robot_pos.x = p[0]
         self.rcvr.robot_pos.y = p[1]
+        self.rcvr.robot_ang = self.angle + START_YAW_MAP
 
     def display_target_status(self, tpos, tvel):
         if not self.target_ever_found:

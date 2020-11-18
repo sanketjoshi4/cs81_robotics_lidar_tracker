@@ -3,6 +3,7 @@ from cell import Cell
 import follower_utils
 from world import World
 import heapq as hq
+import numpy as np
 
 
 LOST_THRESH = 10 # s
@@ -18,11 +19,12 @@ class Recovery:
 
         # last known pose of target; right now hard-coded, but later Robot should pass this pose to Recovery object
         self.last_known_pos = Point()
-        self.last_known_pos.x = 2.17
-        self.last_known_pos.y = 4.6
+        self.last_known_pos.x = 4
+        self.last_known_pos.y = 5
 
         # robot's current pose (pose at which we adopt recovery mode)
         self.robot_pos = None
+        self.robot_ang = 0 # map frame yaw in rads
 
         # output stats for later?
         self.elapsed_lost_time = 0
@@ -111,6 +113,10 @@ class Recovery:
 
         closed_set = {} # dict maps curr_node:parent_node for back tracing later
 
+        closed_set_angles = {} # maps curr_node:optimal angle to get here from prev node
+ 
+        closed_set_angles[start] = self.robot_ang
+
         g_vals = {} # dict maps node to actual cost to get from start to node
         g_vals[start] = 0
 
@@ -123,8 +129,9 @@ class Recovery:
                 print("found")
                 path = []
                 while curr in closed_set:
-                        path.append(curr)
-                        curr = closed_set[curr]
+                    path.append(curr)
+                    curr = closed_set[curr]
+                print("found 1")
                 return path # [goal, ..., c, b, a] reversed so we can pop() later
 
             # look at all neighbors in y dir
@@ -135,10 +142,12 @@ class Recovery:
                     # if not current cell and doesn't have obstacle
                     if (cy != ny or cx != nx) and not self.world.get_cell(nx, ny) and not self.is_near_obs(nx, ny):
                         n = Cell([nx, ny])
-                        temp_g = g_vals[curr] + EDGE_WEIGHT
+                        temp_yaw = self.get_rotate_yaw(cx, cy, closed_set_angles[curr], nx, ny)
+                        temp_g = g_vals[curr] + EDGE_WEIGHT + abs(temp_yaw)
                         # if cost from start to n is lowest so far, or no cost calculated yet
                         if (n in g_vals and temp_g < g_vals[n]) or (n not in g_vals):
                             closed_set[n] = curr # update shortest path to n
+                            closed_set_angles[n] = temp_yaw
                             g_vals[n] = temp_g
                             temp_f = g_vals[n] + self.diagonal(nx, ny)
                             for i in range(len(open_set)):
@@ -151,6 +160,32 @@ class Recovery:
 
         return []
 
+    def get_rotate_yaw(self, x1, y1, yaw1, x2, y2):
+        """
+        """
+        if x2 == x1:
+            if y2 < y1:
+                return np.pi / 2 - yaw1
+            if y2 > y1:
+                return -np.pi / 2 - yaw1
+        if y2 == y1:
+            if x2 < x1:
+                return np.pi - yaw1
+            if x2 > x1:
+                return 0 - yaw1
+        if x2 < x1:
+            if y2 < y1:
+                return np.pi * 0.75 - yaw1
+            if y2 > y1:
+                return -np.pi * 0.75 - yaw1
+        if x2 > x1:
+            if y2 < y1:
+                return np.pi * 0.25 - yaw1
+            if y2 > y1:
+                return -np.pi * 0.25 - yaw1
+        print("ERROR IN GET YAW ROTATE")
+
+
     def is_near_obs(self, x, y):
         """
         Check if cell index at x,y is near a rock, to take into account of robot size in map
@@ -161,7 +196,6 @@ class Recovery:
                     if self.world.get_cell(nx, ny): # has obstacle
                         return True
         return False
-                    
 
     def get_path_poses(self, path):
         """
