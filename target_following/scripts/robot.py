@@ -25,6 +25,7 @@ PI = np.pi
 # TODO : Figure out a better way to code robot's start pose .. env vars?
 START_X_MAP = 3.0  # Would change as per the map
 START_Y_MAP = 5.0  # Would change as per the map
+START_YAW_MAP = 0
 
 
 # START_Z_MAP = 0.0
@@ -127,6 +128,7 @@ class Robot:
         self.rcvr.robot_pos = Point()
         self.rcvr.robot_pos.x = p[0]
         self.rcvr.robot_pos.y = p[1]
+        self.rcvr.robot_ang = self.angle + START_YAW_MAP
 
     def display_target_status(self, tpos, tvel):
         if not self.target_ever_found:
@@ -194,7 +196,7 @@ class Robot:
                     # we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
                     self.update_rcvr()  # remember to update Recovery object's required info first
                     self.rcvr_poses = self.rcvr.recover()
-                # print("retrieved rcvr_poses", self.rcvr_poses)
+                print("retrieved rcvr_poses", self.rcvr_poses)
 
                 # in the middle of recovery mode
                 # separate if statement so we don't have to wait until next loop iteration to start moving once entered recovery mode
@@ -210,12 +212,12 @@ class Robot:
                     v = v[0:2]  # only need x,y because of assumption above
                     # remaining angle to turn i.e. angle btwn x-axis vector and vector of x,y above
                     ang = np.arctan2(v[1], v[0])
-                    if -0.025 <= ang <= 0.025:
+                    if -0.05 <= ang <= 0.05:
                         # turn finished so start moving in lin x only, if applicable
                         ang_z = 0
                         # remaining euclidean distance to travel, assume no movement in z-axis
                         dis = np.linalg.norm(np.array([0, 0]) - v)
-                        if -0.025 <= dis <= 0.025:
+                        if -0.05 <= dis <= 0.05:
                             # lin x move finished, pop this pose
                             self.rcvr_poses.pop()
                             continue  # no need to waste a publication
