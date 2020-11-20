@@ -57,7 +57,7 @@ rosbot
 # obstacle 1
 obs_rosbot
 (
-  pose [ 1.000 1.500 0.000 75.000 ]
+  pose [ 0.500 2.800 0.000 90.000 ]
   name "obs_rosbot"
   color "red"
 )
@@ -65,7 +65,7 @@ obs_rosbot
 # obstacle 2
 obs_rosbot
 (
-  pose [ 8.000 9.500 0.000 165.000 ]
+  pose [ 8.300 10.200 0.000 165.000 ]
   name "obs_rosbot"
   color "red"
 )
@@ -81,7 +81,7 @@ obs_rosbot
 # obstacle 4
 obs_rosbot
 (
-  pose [ 2.000 9.000 0.000 25.000 ]
+  pose [ 2.500 9.000 0.000 25.000 ]
   name "obs_rosbot"
   color "red"
 )
