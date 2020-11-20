@@ -2,6 +2,7 @@
 
 import numpy as np
 import math
+import copy
 
 import follower_utils
 from recovery import Recovery
@@ -130,6 +131,20 @@ class Robot:
         self.rcvr.robot_pos.y = p[1]
         self.rcvr.robot_ang = self.angle + START_YAW_MAP
 
+        # update local map
+        blobs = copy.deepcopy(self.id.blobs)
+        #self.get_transform() # update again
+        #for blob_id in blobs:
+        #    arr = blobs[blob_id].arr
+        #    for i in range(len(arr)):
+        #        x, y = arr[i]
+        #        p = np.linalg.inv(self.bTo).dot(np.transpose(np.array([x, y, 0, 1])))
+        #        p = self.mTo.dot(p)[0:2]
+        #        arr[i] = (p[0], p[1])
+
+        self.rcvr.create_local_world(blobs)
+
+
     def display_target_status(self, tpos, tvel):
         if not self.target_ever_found:
             return
@@ -162,7 +177,7 @@ class Robot:
             # self.display_target_status(tpos, tvel)
 
             # we detect target so decide how to move using PID-like function
-            if tpos is not None and tvel is not None:
+            if False and tpos is not None and tvel is not None:
 
                 self.pub_visibility(True)  # can see the target
                 lin_x, ang_z = self.chase(tpos, tvel)
@@ -177,11 +192,11 @@ class Robot:
                 if self.rcvr_poses:
                     self.rcvr_poses = []
 
-            elif rospy.get_time() - start_time < Identifier.ID_INIT_TIME:
+            elif False and rospy.get_time() - start_time < Identifier.ID_INIT_TIME:
                 self.pub_visibility(True)
                 continue
 
-            elif not self.target_ever_found:
+            elif False and not self.target_ever_found:
                 self.pub_visibility(True)
                 continue
 
@@ -195,8 +210,8 @@ class Robot:
                 if not self.rcvr_poses:
                     # we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
                     self.update_rcvr()  # remember to update Recovery object's required info first
-                    self.rcvr_poses = self.rcvr.recover()
-                print("retrieved rcvr_poses", self.rcvr_poses)
+                    #self.rcvr_poses = self.rcvr.recover()
+                #print("retrieved rcvr_poses", self.rcvr_poses)
 
                 # in the middle of recovery mode
                 # separate if statement so we don't have to wait until next loop iteration to start moving once entered recovery mode

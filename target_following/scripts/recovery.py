@@ -4,11 +4,14 @@ import follower_utils
 from world import World
 import heapq as hq
 import numpy as np
+import math
 
 
 LOST_THRESH = 10 # s
 EDGE_WEIGHT = 1 # constant edge weight because everything is 1 grid square away from us, may change this
 SEARCH_RANGE = 5 # grid squares
+LIDAR_RADIUS = 2 # m
+RESO = 0.05 # m
 
 
 class Recovery:
@@ -29,10 +32,45 @@ class Recovery:
         # output stats for later?
         self.elapsed_lost_time = 0
 
-        # full knowledge of world
+        # full knowledge of worldi; if None then caller must provide data to update local world before calling recover()
         self.world = world
 
         print("init done")
+
+    def create_local_world(self, blobs):
+        """
+        Construct local world from blobs dict of {blob_id:Blob()}
+        """
+        # (data, width, height, reso, frame, origin)
+        world_w = int(LIDAR_RADIUS * 2 / RESO) + 1 # account for center position where robot is
+        world_h = int(LIDAR_RADIUS * 2 / RESO) + 1
+        world_res = RESO
+        world_frame = "map"
+        
+        world_arr = np.zeros(world_w * world_h, dtype = int)
+        world_arr[:] = 2
+        cx = int(world_w / 2)
+        cy = int(world_h / 2)
+        for x in range(cx - int(LIDAR_RADIUS / RESO), cx + int(LIDAR_RADIUS / RESO) + 1):
+            for y in range(cy - int(LIDAR_RADIUS / RESO), cy + int(LIDAR_RADIUS / RESO) + 1):
+                if (x-cx)**2 + (y-cy)**2 <= (LIDAR_RADIUS / RESO)**2:
+                    world_arr[x + y * world_w] = 0
+
+        for blob_id in blobs:
+            arr = blobs[blob_id].arr
+            for pos_x,pos_y in arr:
+                x = cx + int(pos_x / RESO)
+                y = cy + int(pos_y / RESO)
+                print("obs at", pos_x,pos_y)
+                world_arr[x + y * world_w] = 1
+
+        print("MAP IS")
+        for h in range(world_h):
+            s = "["
+            for w in range(world_w):
+                s += str(world_arr[w + h * world_w]) + ","
+            s += "]"
+            print(s)
 
     def recover(self):
         """
