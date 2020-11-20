@@ -162,7 +162,7 @@ class Robot:
             # self.display_target_status(tpos, tvel)
 
             # we detect target so decide how to move using PID-like function
-            if False and tpos is not None and tvel is not None:
+            if tpos is not None and tvel is not None:
 
                 self.pub_visibility(True)  # can see the target
                 lin_x, ang_z = self.chase(tpos, tvel)
@@ -177,11 +177,11 @@ class Robot:
                 if self.rcvr_poses:
                     self.rcvr_poses = []
 
-            elif False and rospy.get_time() - start_time < Identifier.ID_INIT_TIME:
+            elif rospy.get_time() - start_time < Identifier.ID_INIT_TIME:
                 self.pub_visibility(True)
                 continue
 
-            elif False and not self.target_ever_found:
+            elif not self.target_ever_found:
                 self.pub_visibility(True)
                 continue
 

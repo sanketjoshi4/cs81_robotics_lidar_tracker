@@ -19,8 +19,8 @@ class Recovery:
 
         # last known pose of target; right now hard-coded, but later Robot should pass this pose to Recovery object
         self.last_known_pos = Point()
-        self.last_known_pos.x = 2.5
-        self.last_known_pos.y = 6.3
+        self.last_known_pos.x = 1.65
+        self.last_known_pos.y = 7.4
 
         # robot's current pose (pose at which we adopt recovery mode)
         self.robot_pos = None
