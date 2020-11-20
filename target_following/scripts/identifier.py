@@ -45,8 +45,10 @@ class Identifier:
 
         self.blobs = {}  # dict of blob_id to Blob item
         self.target = None  # (x, y)
-        self.obs = None  # list of Blob items
+        self.obs_ids = None  # list of Blob item ids
+        self.obj_ids = None  # list of moving object ids, minus target
         self.target_vel = None  # list of Blob items
+        self.obs_intervals = None
 
         self.last_blobs = {}  # blobs during last scan
         self.last_target = None  # (x, y)
@@ -66,6 +68,7 @@ class Identifier:
         # save blobs from last scan
         self.last_blobs = copy.deepcopy(self.blobs)
         self.blobs = {}
+        obs_flag_arr = []
 
         blob_id = 0
 
@@ -74,7 +77,9 @@ class Identifier:
 
             if dist >= Identifier.LASER_RANGE:
                 blob_id += 1
+                obs_flag_arr.append(False)
                 continue
+            obs_flag_arr.append(True)
 
             angle = amin + incr * idx
             incident = (dist * np.cos(angle), dist * np.sin(angle))
@@ -92,13 +97,16 @@ class Identifier:
         for blob_id, blob in self.blobs.items():
             blob.calculate_mean_and_size(incr)
 
+        self.obs_intervals = self.get_obstacle_intervals(obs_flag_arr, amin, incr)
+
         print [b.show(robot) for _, b in self.blobs.items()]
 
     def classify(self, movement_transform):
         """ This is responsible for separating moving blobs from static ones. Saves the blob in motion as the target """
 
         # TODO : In case of multiple moving objects, use target's last position as a weight in identifying the target
-        obs = set()
+        obs_ids = set()
+        obj_ids = set()
         target = None
 
         for last_blob_id, last_blob in self.last_blobs.items():
@@ -132,28 +140,30 @@ class Identifier:
                 if is_different:
                     continue
                 if too_large:
-                    print "OBS:{},{}".format(blob_id, last_blob_id)
-                    obs.add(blob_id)
+                    # print "OBS:{},{}".format(blob_id, last_blob_id)
+                    obs_ids.add(blob_id)
                     continue
                 if not close_to_last_target:
+                    obj_ids.add(blob_id)
                     continue
                 if is_moving:
-                    print "TARGET:{},{}".format(blob_id, last_blob_id)
+                    # print "TARGET:{},{}".format(blob_id, last_blob_id)
                     target = blob
                     continue
                 if is_static:
-                    print "STATIC:{},{}".format(blob_id, last_blob_id)
+                    # print "STATIC:{},{}".format(blob_id, last_blob_id)
                     target = blob
                     pass
 
         # Save last blobs and target
-        self.last_obs = copy.deepcopy(self.obs)
+        self.last_obs = copy.deepcopy(self.obs_ids)
         self.last_target = copy.deepcopy(self.target)  # in base_scan ref
         self.last_known_target = copy.deepcopy(self.target) if self.target is not None else self.last_known_target
         # self.last_target_vel = copy.deepcopy(self.target_vel)  # in base_scan ref
 
         # Update blobs and target
-        self.obs = obs
+        self.obs_ids = obs_ids
+        self.obj_ids = obj_ids
         self.target = target.mean if target is not None else None  # in base_scan ref
 
     def status(self):
@@ -221,6 +231,25 @@ class Identifier:
         )
 
         return target_pos, target_vel
+
+    def get_obstacles(self):
+        return [self.blobs[blob_id] for blob_id in (self.obj_ids + self.obs_ids)]
+
+    def get_obstacle_intervals(self, obs_flag_arr, amin, incr):
+        in_obstacle = obs_flag_arr[0] == True
+        temp_start = 0
+        intervals = []
+        for idx, is_obs in enumerate(obs_flag_arr):
+            if not in_obstacle and is_obs:
+                temp_start = idx
+                in_obstacle = True
+            elif in_obstacle and not is_obs:
+                intervals.append((temp_start, idx - 1))
+                in_obstacle = False
+        if in_obstacle:
+            intervals.append((temp_start, len(obs_flag_arr) - 1))
+
+        return [(amin + incr * interval[0], amin + incr * interval[1]) for interval in intervals]
 
 
 class Blob:

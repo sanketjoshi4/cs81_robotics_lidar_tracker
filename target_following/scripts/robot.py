@@ -255,7 +255,7 @@ class Robot:
         tvx = tvel[0]  # target vel x
         tvy = tvel[1]  # target vel y
 
-        obs = self.id.obs
+        obs_intervals = self.id.obs_intervals
 
         # print "RP:{},{},{}".format(follower_utils.show(rpx), follower_utils.show(rpy), follower_utils.show(rpz))
         # print "RV:{},{},{}".format(follower_utils.show(rvx), follower_utils.show(rvy), follower_utils.show(rvz))
