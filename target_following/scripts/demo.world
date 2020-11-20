@@ -54,3 +54,36 @@ rosbot
   color "green"
 )
 
+# obstacle 1
+obs_rosbot
+(
+  pose [ 1.000 1.500 0.000 75.000 ]
+  name "obs_rosbot"
+  color "red"
+)
+
+# obstacle 2
+obs_rosbot
+(
+  pose [ 8.000 9.500 0.000 165.000 ]
+  name "obs_rosbot"
+  color "red"
+)
+
+# obstacle 3
+obs_rosbot
+(
+  pose [ 9.500 3.000 0.000 105.000 ]
+  name "obs_rosbot"
+  color "red"
+)
+
+# obstacle 4
+obs_rosbot
+(
+  pose [ 2.000 9.000 0.000 25.000 ]
+  name "obs_rosbot"
+  color "red"
+)
+
+
