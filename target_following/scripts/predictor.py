@@ -23,6 +23,12 @@ class Predictor:
 
 	# given pose information from Identifier, updating instance variable for Predictors
 	def update_targetpos(self, posx, posy, xvel, yvel):
+
+		# if the target was not found, clearing the poses list and returning
+		if posx==None or posy==None or xvel==None or yvel==None:
+			self.poses = []
+			return None
+
 		# creating new instance of pose class
 		target = Pose(posx, posy, xvel, yvel)
 	
@@ -43,6 +49,11 @@ class Predictor:
 
 	# given poses, return robot intended linear and angular velocity
 	def predict(self, dt): 
+
+		# if there is nothing in the poses list, simply returning
+		if len(self.poses)<1:
+			return None
+
 		last_obs = self.poses[-1]
 		if len(self.poses) > 1:
 			seclast_obs = self.poses[-2]
@@ -69,6 +80,10 @@ class Predictor:
 
 	# more advanced version of prediiction 
 	def predict_hd(self, dt):
+
+		# skipping if there is nothing in the list and therefore returning None for predict
+		if len(self.poses)<1:
+			return None
 
 		total_xthird = 0
 		total_ythird = 0
@@ -125,10 +140,19 @@ class Predictor:
 		#while not rospy.is_shutdown():
 			#self.update_targetpos(1, 1, 1, 0)
 			#self.predict_hd(0.1)
-			#self.update_targetpos(2, 1, 0, 1)
+			#print self.poses
+			#self.update_targetpos(None, 1, 0, 1)
 			#self.predict_hd(0.1)
-			#self.update_targetpos(2, 2, 0, 0)
+			#print self.poses
+			#self.update_targetpos(2, 2, None, None)
 			#self.predict_hd(0.1)
+			#print self.poses
+			#self.update_targetpos(2, 2, None, None)
+			#self.predict_hd(0.1)
+			#print self.poses
+			#self.update_targetpos(0, 0, 1, 1)
+			#self.predict_hd(0.1)
+			#print self.poses
 
 			#break
 
