@@ -101,7 +101,6 @@ class Identifier:
     def classify(self, movement_transform):
         """ This is responsible for separating moving blobs from static ones. Saves the blob in motion as the target """
 
-        # TODO : In case of multiple moving objects, use target's last position as a weight in identifying the target
         obs_ids = set()
         obj_ids = set()
         target = None
@@ -166,7 +165,6 @@ class Identifier:
     def status(self):
         """ This returns the FSM state given the target location w.r.t. robot """
 
-        # TODO : Distinguish between OOS and OOR
         if self.target is None:
             return Identifier.STATUS_ERR
         dist = float(np.sqrt(self.target[0] * self.target[0] + self.target[1] * self.target[1]))

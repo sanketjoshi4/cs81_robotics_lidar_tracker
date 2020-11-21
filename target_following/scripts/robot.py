@@ -106,10 +106,7 @@ class Robot:
         """ Uses laser scan to update target position """
 
         curr_time = rospy.get_time()
-        # print curr_time, self.time_last_scan
         if self.time_last_scan is None or (curr_time - self.time_last_scan > 1 / Identifier.SCAN_FREQ):
-            # print 1111
-            # Scan based on SCAN_FREQ
 
             if self.posx is not None and self.last_posx is not None:
                 self.id.blobify(laser_scan_msg, self)  # Identify blobs
@@ -117,13 +114,22 @@ class Robot:
                 tpos, tvel = self.id.get_target_pos_vel(robot=self, frame="MAP")
                 self.display_target_status(tpos, tvel)
 
-                # TODO: uncomment when predict_hd is fixed
-                # self.pred.update_targetpos(
-                #     None if tpos is None else tpos[0],
-                #     None if tpos is None else tpos[1],
-                #     None if tvel is None else tvel[0],
-                #     None if tvel is None else tvel[1]
-                # )
+                self.pred.update_targetpos(
+                    None if tpos is None else tpos[0],
+                    None if tpos is None else tpos[1],
+                    None if tvel is None else tvel[0],
+                    None if tvel is None else tvel[1]
+                )
+
+                # Make lookahead dynamic
+                dt = 0.04
+                # dt = 1 / Identifier.SCAN_FREQ
+                pred = self.pred.predict_hd(dt, 5)
+                if pred is not None:
+                    pred_vel, pred_poses = pred
+                    for p in pred_poses:
+                        print "Pred Pos :   ({},{})".format(
+                            follower_utils.show(p[0]), follower_utils.show(p[1]))
 
             # Update last pose to current
             self.last_posx = self.posx
@@ -174,10 +180,6 @@ class Robot:
 
             tpos, tvel = self.id.get_target_pos_vel(robot=self, frame="MAP")
             self.target_ever_found = self.target_ever_found or tpos is not None
-
-            # Make lookahead dynamic
-            # pred_vel, pred_poses = self.pred.predict_hd(1 / Identifier.SCAN_FREQ, 5)
-            # print pred_poses
 
             # we detect target so decide how to move using PID-like function
             if tpos is not None and tvel is not None:

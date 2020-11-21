@@ -25,13 +25,14 @@ class Predictor:
 	def update_targetpos(self, posx, posy, xvel, yvel):
 
 		# if the target was not found, clearing the poses list and returning
-		if posx==None or posy==None or xvel==None or yvel==None:
+		if None in [posx, posy, xvel, yvel]:
 			self.poses = []
 			return None
 
 		# creating new instance of pose class
 		target = Pose(posx, posy, xvel, yvel)
-	
+		last = None
+
 		# with more than one observation, velocities are there
 		if len(self.poses) >= 1:
 			last = self.poses[-1]
@@ -74,7 +75,6 @@ class Predictor:
 			predposes.append( (xnew, ynew) ) 		
 			i += 1
 		# returning the predicted velocities in the tuple and the next five poses
-		print (predtuple, predposes)
 		return (predtuple, predposes)
 
 
@@ -118,8 +118,10 @@ class Predictor:
 			predy_vel = last_obs.get_yvel() 
 		
 		# normalizing the velocity, since the max is 1 m/s
-		self.predx_vel = predx_vel/ (predx_vel*predx_vel + predy_vel*predy_vel) 
-		self.predy_vel = predy_vel/ (predx_vel*predx_vel + predy_vel*predy_vel) 
+		self.predx_vel = 0 if predx_vel == predy_vel == 0 else predx_vel / (
+					predx_vel * predx_vel + predy_vel * predy_vel)
+		self.predy_vel = 0 if predx_vel == predy_vel == 0 else predy_vel / (
+					predx_vel * predx_vel + predy_vel * predy_vel)
 		predtuple = (self.predx_vel, self.predy_vel)
 		
 		predposes = []		
@@ -129,8 +131,7 @@ class Predictor:
 			ynew = last_obs.get_posy() + (i+1)*self.predy_vel*dt
 			predposes.append( (xnew, ynew) )		
 			i += 1
-		# returning the predicted velocities in the tuple and the next five poses
-		print (predtuple, predposes)
+		# returning the predicted velocities in the tuple and the next N poses
 		return (predtuple, predposes)
 
 			
