@@ -65,13 +65,13 @@ class Recovery:
                 print("obs at", pos_x,pos_y)
                 world_arr[x + y * world_w] = 1
 
-        print("MAP IS")
-        for h in range(world_h):
-            s = "["
-            for w in range(world_w):
-                s += str(world_arr[w + h * world_w]) + ","
-            s += "]"
-            print(s)
+#        print("MAP IS")
+#        for h in range(world_h):
+#            s = "["
+#            for w in range(world_w):
+#                s += str(world_arr[w + h * world_w]) + ","
+#            s += "]"
+#            print(s)
 
         origin = Pose()
         origin.position = Point()
@@ -79,7 +79,7 @@ class Recovery:
         origin.position.y = self.robot_pos.y - LIDAR_RADIUS
         origin.position.z = 0
         origin.orientation = Quaternion()
-        quaternion = tf.transformations.quaternion_from_euler(0, 0, self.robot_ang)
+        quaternion = tf.transformations.quaternion_from_euler(0, 0, 0)
         origin.orientation.x = quaternion[0]
         origin.orientation.y = quaternion[1]
         origin.orientation.z = quaternion[2]

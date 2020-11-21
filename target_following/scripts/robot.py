@@ -177,7 +177,7 @@ class Robot:
             # self.display_target_status(tpos, tvel)
 
             # we detect target so decide how to move using PID-like function
-            if False and tpos is not None and tvel is not None:
+            if tpos is not None and tvel is not None:
 
                 self.pub_visibility(True)  # can see the target
                 lin_x, ang_z = self.chase(tpos, tvel)
@@ -192,11 +192,11 @@ class Robot:
                 if self.rcvr_poses:
                     self.rcvr_poses = []
 
-            elif False and rospy.get_time() - start_time < Identifier.ID_INIT_TIME:
+            elif rospy.get_time() - start_time < Identifier.ID_INIT_TIME:
                 self.pub_visibility(True)
                 continue
 
-            elif False and not self.target_ever_found:
+            elif not self.target_ever_found:
                 self.pub_visibility(True)
                 continue
 
@@ -216,6 +216,7 @@ class Robot:
                 # in the middle of recovery mode
                 # separate if statement so we don't have to wait until next loop iteration to start moving once entered recovery mode
                 if self.rcvr_poses:
+                    print("goal in map frame:", self.rcvr_poses[0])
                     # essentially we are moving to every position from a list that goes [[goalx, goaly], ..., [startx, starty]], if we encounter
                     # target before we finish this list i.e. state changes back to REGULAR, just clear list to prep for next recovery call
                     pose = self.rcvr_poses[-1]
@@ -237,7 +238,7 @@ class Robot:
                             self.rcvr_poses.pop()
                             continue  # no need to waste a publication
                         else:
-                            lin_x = VEL  # rotation ensures we always move forward
+                            lin_x = VEL # rotation ensures we always move forward
                     else:
                         lin_x = 0
                         if ang < 0:
