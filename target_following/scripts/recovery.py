@@ -1,10 +1,11 @@
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import Point, Pose, Quaternion
 from cell import Cell
 import follower_utils
 from world import World
 import heapq as hq
 import numpy as np
 import math
+import tf
 
 
 LOST_THRESH = 10 # s
@@ -22,8 +23,8 @@ class Recovery:
 
         # last known pose of target; right now hard-coded, but later Robot should pass this pose to Recovery object
         self.last_known_pos = Point()
-        self.last_known_pos.x = 1.65
-        self.last_known_pos.y = 7.4
+        self.last_known_pos.x = 4
+        self.last_known_pos.y = 5
 
         # robot's current pose (pose at which we adopt recovery mode)
         self.robot_pos = None
@@ -71,6 +72,20 @@ class Recovery:
                 s += str(world_arr[w + h * world_w]) + ","
             s += "]"
             print(s)
+
+        origin = Pose()
+        origin.position = Point()
+        origin.position.x = self.robot_pos.x - LIDAR_RADIUS
+        origin.position.y = self.robot_pos.y - LIDAR_RADIUS
+        origin.position.z = 0
+        origin.orientation = Quaternion()
+        quaternion = tf.transformations.quaternion_from_euler(0, 0, self.robot_ang)
+        origin.orientation.x = quaternion[0]
+        origin.orientation.y = quaternion[1]
+        origin.orientation.z = quaternion[2]
+        origin.orientation.w = quaternion[3]
+
+        self.world = World(world_arr, world_w, world_h, world_res, world_frame, origin)
 
     def recover(self):
         """

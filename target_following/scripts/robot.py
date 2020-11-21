@@ -210,7 +210,7 @@ class Robot:
                 if not self.rcvr_poses:
                     # we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
                     self.update_rcvr()  # remember to update Recovery object's required info first
-                    #self.rcvr_poses = self.rcvr.recover()
+                    self.rcvr_poses = self.rcvr.recover()
                 #print("retrieved rcvr_poses", self.rcvr_poses)
 
                 # in the middle of recovery mode
