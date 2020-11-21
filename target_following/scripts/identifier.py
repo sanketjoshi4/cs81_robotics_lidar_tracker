@@ -68,18 +68,14 @@ class Identifier:
         # save blobs from last scan
         self.last_blobs = copy.deepcopy(self.blobs)
         self.blobs = {}
-        obs_flag_arr = []
 
         blob_id = 0
-
         # identify blobs
         for idx, dist in enumerate(arr):
 
             if dist >= Identifier.LASER_RANGE:
                 blob_id += 1
-                obs_flag_arr.append(False)
                 continue
-            obs_flag_arr.append(True)
 
             angle = amin + incr * idx
             incident = (dist * np.cos(angle), dist * np.sin(angle))
@@ -97,9 +93,10 @@ class Identifier:
         for blob_id, blob in self.blobs.items():
             blob.calculate_mean_and_size(incr)
 
+        obs_flag_arr = [i < Identifier.LASER_RANGE for i in arr]
         self.obs_intervals = self.get_obstacle_intervals(obs_flag_arr, amin, incr)
 
-        print [b.show(robot) for _, b in self.blobs.items()]
+        # print [b.show(robot) for _, b in self.blobs.items()]
 
     def classify(self, movement_transform):
         """ This is responsible for separating moving blobs from static ones. Saves the blob in motion as the target """
@@ -236,7 +233,7 @@ class Identifier:
         return [self.blobs[blob_id] for blob_id in (self.obj_ids + self.obs_ids)]
 
     def get_obstacle_intervals(self, obs_flag_arr, amin, incr):
-        in_obstacle = obs_flag_arr[0] == True
+        in_obstacle = obs_flag_arr[0] is True
         temp_start = 0
         intervals = []
         for idx, is_obs in enumerate(obs_flag_arr):

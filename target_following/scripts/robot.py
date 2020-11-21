@@ -6,6 +6,7 @@ import math
 import follower_utils
 from recovery import Recovery
 from identifier import Identifier
+from predictor import Predictor
 from world import World
 
 import rospy
@@ -56,6 +57,7 @@ class Robot:
         self.rcvr_poses = []  # all poses to move to in order to get to last detected target pose
         self.rcvr = None
         self.id = Identifier()
+        self.pred = Predictor()
         self.time_last_scan = None
         self.target_ever_found = False
 
@@ -115,6 +117,14 @@ class Robot:
                 tpos, tvel = self.id.get_target_pos_vel(robot=self, frame="MAP")
                 self.display_target_status(tpos, tvel)
 
+                # TODO: uncomment when predict_hd is fixed
+                # self.pred.update_targetpos(
+                #     None if tpos is None else tpos[0],
+                #     None if tpos is None else tpos[1],
+                #     None if tvel is None else tvel[0],
+                #     None if tvel is None else tvel[1]
+                # )
+
             # Update last pose to current
             self.last_posx = self.posx
             self.last_posy = self.posy
@@ -144,6 +154,11 @@ class Robot:
         else:
             print "Target Lost"
 
+        # print "OBS_INT: ", [(follower_utils.show(180.0 * i[0] / PI), follower_utils.show(180.0 * i[1] / PI)) for i in
+        #                     self.id.obs_intervals]
+
+        # print "OBS_INT: ", self.id.obs_intervals
+
     def move(self):
         self.rcvr = Recovery(self.map)
 
@@ -159,7 +174,10 @@ class Robot:
 
             tpos, tvel = self.id.get_target_pos_vel(robot=self, frame="MAP")
             self.target_ever_found = self.target_ever_found or tpos is not None
-            # self.display_target_status(tpos, tvel)
+
+            # Make lookahead dynamic
+            # pred_vel, pred_poses = self.pred.predict_hd(1 / Identifier.SCAN_FREQ, 5)
+            # print pred_poses
 
             # we detect target so decide how to move using PID-like function
             if tpos is not None and tvel is not None:
@@ -251,24 +269,12 @@ class Robot:
 
         tpx = tpos[0]  # target pos x
         tpy = tpos[1]  # target pos y
+        tpz = math.atan2(self.id.target[1], self.id.target[0])
 
         tvx = tvel[0]  # target vel x
         tvy = tvel[1]  # target vel y
 
         obs_intervals = self.id.obs_intervals
-
-        # print "RP:{},{},{}".format(follower_utils.show(rpx), follower_utils.show(rpy), follower_utils.show(rpz))
-        # print "RV:{},{},{}".format(follower_utils.show(rvx), follower_utils.show(rvy), follower_utils.show(rvz))
-        # print "TP:{},{}".format(follower_utils.show(tpx), follower_utils.show(tpy))
-        # print "TV:{},{}".format(follower_utils.show(tvx), follower_utils.show(tvy))
-
-        if self.id.target is not None:
-            # print "PID-TargetY:", self.id.target[1]
-            ang_z = self.id.target[1] * Robot.KP if self.id.target is not None else 0
-
-        dist = math.sqrt((rpx - tpx) * (rpx - tpx) + (rpy - tpy) * (rpy - tpy))
-        if dist < 0.3:
-            lin_x = 0
 
         """
         speed,  angle_of_pid <- pid_like(rp, rv, tp, tv)
@@ -281,7 +287,28 @@ class Robot:
         return angle_of_pid + angle_wiggle
         """
 
-        # (angle, vel_tuple) = self.pid_like((rpx, rpy), (rvx, rvy), (tpx, tpy), (tvx, tvy))
+        chase_angle = tpz
+
+        # TODO: switch from tpz to predicted angle once predict_hd works
+        # colliding_obs = [obs_int for obs_int in obs_intervals if obs_int[0] <= tpz <= obs_int[1]]
+        # if len(colliding_obs) > 0:
+        #     # colliding, use find tangent
+        #     min_ang_obs, max_ang_obs = colliding_obs[0]
+        #     tangent_angle = min_ang_obs if tpz - min_ang_obs < max_ang_obs - tpz else max_ang_obs
+        #
+        #     # find wiggle angle
+        #     wiggle_angle = self.get_wiggle((rvx, rvy), (tvx, tvy))
+        #
+        #     chase_angle = tangent_angle + wiggle_angle
+
+        if self.id.target is not None:
+            # print "PID-TargetY:", self.id.target[1]
+            ang_z = chase_angle * Robot.KP if self.id.target is not None else 0
+            # ang_z = self.id.target[1] * Robot.KP if self.id.target is not None else 0
+
+        dist = math.sqrt((rpx - tpx) * (rpx - tpx) + (rpy - tpy) * (rpy - tpy))
+        if dist < 0.3:
+            lin_x = 0
 
         return lin_x, ang_z
 

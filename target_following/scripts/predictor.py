@@ -68,7 +68,7 @@ class Predictor:
 
 
 	# more advanced version of prediiction 
-	def predict_hd(self, dt):
+	def predict_hd(self, dt, lookahead):
 
 		total_xthird = 0
 		total_ythird = 0
@@ -109,7 +109,7 @@ class Predictor:
 		
 		predposes = []		
 		i = 0
-		while i < 5:
+		while i < lookahead:
 			xnew = last_obs.get_posx() + (i+1)*self.predx_vel*dt
 			ynew = last_obs.get_posy() + (i+1)*self.predy_vel*dt
 			predposes.append( (xnew, ynew) )		
