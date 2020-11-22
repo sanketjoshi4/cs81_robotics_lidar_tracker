@@ -4,7 +4,7 @@ import numpy as np
 import math
 import copy
 
-import follower_utils
+import utils
 from recovery import Recovery
 from identifier import Identifier
 from predictor import Predictor
@@ -50,7 +50,7 @@ class Robot:
         self.last_angle = None
 
         # useful transformation matrices for movement
-        self.mTo = np.array(
+        self.mTo = np.matrix(
             # corrected!
             [[1, 0, 0, START_X_MAP], [0, 1, 0, START_Y_MAP], [0, 0, 1, 0], [0, 0, 0, 1]])  # odom to map
         self.bTo = None  # odom to base_link
@@ -122,16 +122,6 @@ class Robot:
                     None if tvel is None else tvel[1]
                 )
 
-                # Make lookahead dynamic
-                dt = 0.04
-                # dt = 1 / Identifier.SCAN_FREQ
-                pred = self.pred.predict_hd(dt, 5)
-                if pred is not None:
-                    pred_vel, pred_poses = pred
-                    for p in pred_poses:
-                        print "Pred Pos :   ({},{})".format(
-                            follower_utils.show(p[0]), follower_utils.show(p[1]))
-
             # Update last pose to current
             self.last_posx = self.posx
             self.last_posy = self.posy
@@ -160,25 +150,17 @@ class Robot:
 
         self.rcvr.create_local_world(blobs)
 
-
     def display_target_status(self, tpos, tvel):
         if not self.target_ever_found:
             return
 
         print "{}".format(''.join(['-' for _ in range(100)]))
         if tpos is not None:
-            print "Target Pos : ({},{})".format(
-                follower_utils.show(tpos[0]), follower_utils.show(tpos[1]))
-        # if tvel is not None:
-        # 	print "Target Vel : ({},{})".format(
-        # 		follower_utils.show(tvel[0]), follower_utils.show(tvel[1]))
+            print "Target Pos : ({},{})".format(utils.show(tpos[0]), utils.show(tpos[1]))
+        if tvel is not None:
+            print "Target Vel : ({},{})".format(utils.show(tvel[0]), utils.show(tvel[1]))
         else:
             print "Target Lost"
-
-        # print "OBS_INT: ", [(follower_utils.show(180.0 * i[0] / PI), follower_utils.show(180.0 * i[1] / PI)) for i in
-        #                     self.id.obs_intervals]
-
-        # print "OBS_INT: ", self.id.obs_intervals
 
     def move(self):
         self.rcvr = Recovery(self.map)
@@ -307,7 +289,16 @@ class Robot:
 
         chase_angle = tpz
 
-        # TODO: switch from tpz to predicted angle once predict_hd works
+        # TODO: Adjust dt and lookahead, find better way to define
+        dt = 0.04
+        lookahead = 5
+        pred = self.pred.predict_hd(dt, lookahead)
+        if pred is not None and pred[1] is not None:
+            last_pred_map = pred[1][-1]
+            last_pred_base = utils.map_to_base(last_pred_map, self.mTo, (self.posx, self.posy, self.angle))
+            chase_angle = last_pred_base[1]
+
+        # TODO: handle collisions
         # colliding_obs = [obs_int for obs_int in obs_intervals if obs_int[0] <= tpz <= obs_int[1]]
         # if len(colliding_obs) > 0:
         #     # colliding, use find tangent
@@ -320,9 +311,7 @@ class Robot:
         #     chase_angle = tangent_angle + wiggle_angle
 
         if self.id.target is not None:
-            # print "PID-TargetY:", self.id.target[1]
             ang_z = chase_angle * Robot.KP if self.id.target is not None else 0
-            # ang_z = self.id.target[1] * Robot.KP if self.id.target is not None else 0
 
         dist = math.sqrt((rpx - tpx) * (rpx - tpx) + (rpy - tpy) * (rpy - tpy))
         if dist < 0.3:

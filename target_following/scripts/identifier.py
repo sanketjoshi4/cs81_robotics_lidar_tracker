@@ -3,7 +3,7 @@
 import copy
 import numpy as np
 
-import follower_utils
+import utils
 
 
 class Identifier:
@@ -280,6 +280,8 @@ class Blob:
             trans_odom_to_map=robot.mTo, frame="MAP"
         )
         return "{}:[{}]@({},{})".format(self.id,
-                                        follower_utils.show(self.size),
-                                        follower_utils.show(mean_map[0], 1),
-                                        follower_utils.show(mean_map[1], 1))
+                                        utils.show(self.size),
+                                        utils.show(mean_map[0], 1),
+                                        utils.show(mean_map[1], 1)
+        )
+
