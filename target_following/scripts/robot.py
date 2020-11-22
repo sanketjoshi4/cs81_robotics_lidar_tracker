@@ -139,8 +139,8 @@ class Robot:
 
         # update local map
         blobs = copy.deepcopy(self.id.blobs)
-        #self.get_transform() # update again
-        #for blob_id in blobs:
+        # self.get_transform() # update again
+        # for blob_id in blobs:
         #    arr = blobs[blob_id].arr
         #    for i in range(len(arr)):
         #        x, y = arr[i]
@@ -213,7 +213,7 @@ class Robot:
                     # we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
                     self.update_rcvr()  # remember to update Recovery object's required info first
                     self.rcvr_poses = self.rcvr.recover()
-                #print("retrieved rcvr_poses", self.rcvr_poses)
+                # print("retrieved rcvr_poses", self.rcvr_poses)
 
                 # in the middle of recovery mode
                 # separate if statement so we don't have to wait until next loop iteration to start moving once entered recovery mode
@@ -240,7 +240,7 @@ class Robot:
                             self.rcvr_poses.pop()
                             continue  # no need to waste a publication
                         else:
-                            lin_x = VEL # rotation ensures we always move forward
+                            lin_x = VEL  # rotation ensures we always move forward
                     else:
                         lin_x = 0
                         if ang < 0:
@@ -256,6 +256,8 @@ class Robot:
             rate.sleep()
 
     def chase(self, tpos, tvel):
+
+        # TODO: Remove unused variables once done and tested
         lin_x = VEL
         ang_z = 0.0
 
@@ -276,20 +278,11 @@ class Robot:
 
         obs_intervals = self.id.obs_intervals
 
-        """
-        speed,  angle_of_pid <- pid_like(rp, rv, tp, tv)
-        if not obs @ angle_of_pid:
-            return angle_of_pid
-        angle_left <- search left
-        angle_right <- search left
-        angle_of_tangent <- min (a_L,a_R)
-        angle_wiggle <- angle + get_wiggle() # angle diff in robot and target vels
-        return angle_of_pid + angle_wiggle
-        """
-
+        # init chase angle
         chase_angle = tpz
 
         # TODO: Adjust dt and lookahead, find better way to define
+        # Incorporate predicted robot position into chase angle
         dt = 0.04
         lookahead = 5
         pred = self.pred.predict_hd(dt, lookahead)
@@ -298,59 +291,41 @@ class Robot:
             last_pred_base = utils.map_to_base(last_pred_map, self.mTo, (self.posx, self.posy, self.angle))
             chase_angle = last_pred_base[1]
 
-        # TODO: handle collisions
-        # colliding_obs = [obs_int for obs_int in obs_intervals if obs_int[0] <= tpz <= obs_int[1]]
-        # if len(colliding_obs) > 0:
-        #     # colliding, use find tangent
-        #     min_ang_obs, max_ang_obs = colliding_obs[0]
-        #     tangent_angle = min_ang_obs if tpz - min_ang_obs < max_ang_obs - tpz else max_ang_obs
-        #
-        #     # find wiggle angle
-        #     wiggle_angle = self.get_wiggle((rvx, rvy), (tvx, tvy))
-        #
-        #     chase_angle = tangent_angle + wiggle_angle
+        # Incorporate obstacles into chase angle
+        robot_width_angle = 0.1
+        colliding_obs = [obs_int for obs_int in obs_intervals if
+                         obs_int[0] - robot_width_angle <= chase_angle <= obs_int[1] + robot_width_angle]
+
+        if len(colliding_obs) > 0:
+            # colliding, use find tangent
+            min_ang_obs, max_ang_obs = colliding_obs[0]
+
+            if math.fabs(chase_angle - tpz) < 0.2:
+                # print "target is the obstacle"
+                pass
+            else:
+                # print "obs @ < {} | {} >".format(utils.show(min_ang_obs), utils.show(max_ang_obs))
+                go_min_side = tpz - min_ang_obs < max_ang_obs - tpz
+                tangent_angle = min_ang_obs if go_min_side - tpz else max_ang_obs
+                # print "tangent angle : {}".format(utils.show(tangent_angle))
+                # Add wiggle room
+                # TODO: Does the wiggle function provide substantial benefit over constant wiggle? Is it needed?
+                wiggle_angle = 0.1 * (-1 if go_min_side else 1)
+                # wiggle_angle = self.get_wiggle((rvx, rvy), (tvx, tvy))
+                # print "wiggle angle : {}".format(utils.show(wiggle_angle))
+                # wiggle_angle = 0
+                chase_angle = tangent_angle + wiggle_angle
 
         if self.id.target is not None:
             ang_z = chase_angle * Robot.KP if self.id.target is not None else 0
 
         dist = math.sqrt((rpx - tpx) * (rpx - tpx) + (rpy - tpy) * (rpy - tpy))
+
+        # TODO: Get linvel from a pid function to avoid collision with target
         if dist < 0.3:
             lin_x = 0
 
         return lin_x, ang_z
-
-    def pid_like(self, rp, rv, tp, tv):
-        """
-            pid_like :: (rp, rv, tp, tv) -> angle
-            split into x and y
-            consider from the target's frame of ref
-            get the dx and dy
-            convert back to robot's frame
-        """
-        # getting individual components, assuming rv and tv are tuples (rv is robot velocity, tv is predicted target velocity)
-        xrv = rv[0]
-        yrv = rv[1]
-        xtv = tv[0]
-        ytv = tv[1]
-        # rp is robot position, tp is target position
-        xrp = rp[0]
-        yrp = rp[1]
-        xtp = tp[0]
-        ytp = tp[1]
-        # direct velocity
-        diff_x = xtp - xrp
-        diff_y = ytp - yrp
-        # normalizing difference, this produces the direct velocity to the target from the robot (aka, this produces
-        # a normalized velocity in the direction of the target's current position from the robot's current position)
-        direct_velx = diff_x / (math.pow(diff_x, 2) + math.pow(diff_y, 2))
-        direct_vely = diff_y / (math.pow(diff_x, 2) + math.pow(diff_y, 2))
-
-        # averaging the direct velocities and the predicted velocities
-        robot_velx = (xtv + direct_velx) / 2
-        robot_vely = (ytv + direct_vely) / 2
-        vel_tuple = (robot_velx, robot_vely)
-        angle = math.atan2(robot_vely, robot_velx)
-        return (angle, vel_tuple)
 
     def get_wiggle(self, rv, tv):
         """
