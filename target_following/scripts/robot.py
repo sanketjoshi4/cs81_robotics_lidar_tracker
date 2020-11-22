@@ -148,12 +148,13 @@ class Robot:
         self.rcvr.robot_ang = self.angle + START_YAW_MAP
 
         # update local map
+        blobs_cp = copy.deepcopy(self.id.blobs)
         blobs = {} # blob_id:blob_objects
         self.get_transform() # update again
-        for blob_id in self.id.blobs:
+        for blob_id in blobs_cp:
             blobs[blob_id] = Blob(blob_id)
             blobs[blob_id].arr = []
-            arr = self.id.blobs[blob_id].arr
+            arr = blobs_cp[blob_id].arr
             for i in range(len(arr)):
                 x, y = arr[i]
                 p = np.linalg.inv(self.bTo).dot(np.transpose(np.array([x, y, 0, 1])))
