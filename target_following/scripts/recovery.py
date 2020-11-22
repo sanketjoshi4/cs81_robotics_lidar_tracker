@@ -140,8 +140,8 @@ class Recovery:
         """
         Returns the nearest cell index x,y that's not within SEARCH_RANGE of an obstacle
         """
-        for ny in range(y - SEARCH_RANGE * 2, y + SEARCH_RANGE * 2 + 1):
-            for nx in range(x - SEARCH_RANGE * 2, x + SEARCH_RANGE * 2 + 1):
+        for ny in range(max(0, y - SEARCH_RANGE * 2), min(self.world.height, y + SEARCH_RANGE * 2 + 1)):
+            for nx in range(max(0, x - SEARCH_RANGE * 2), min(self.world.width, x + SEARCH_RANGE * 2 + 1)):
                 if ny != y or nx != x:
                     if not self.is_near_obs(nx, ny):
                         return nx, ny
@@ -249,8 +249,8 @@ class Recovery:
         """
         Check if cell index at x,y is near a rock, to take into account of robot size in map
         """
-        for ny in range(y - SEARCH_RANGE, y + SEARCH_RANGE + 1):
-            for nx in range(x - SEARCH_RANGE, x + SEARCH_RANGE + 1):
+        for ny in range(max(0, y - SEARCH_RANGE), min(self.world.height, y + SEARCH_RANGE + 1)):
+            for nx in range(max(0, x - SEARCH_RANGE), min(self.world.width, x + SEARCH_RANGE + 1)):
                 if nx != x or ny != y:
                     if self.world.get_cell(nx, ny): # has obstacle
                         return True
