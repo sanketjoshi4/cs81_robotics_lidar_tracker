@@ -6,7 +6,7 @@ import copy
 
 import follower_utils
 from recovery import Recovery
-from identifier import Identifier
+from identifier import Identifier, Blob
 from predictor import Predictor
 from world import World
 
@@ -148,15 +148,17 @@ class Robot:
         self.rcvr.robot_ang = self.angle + START_YAW_MAP
 
         # update local map
-        blobs = copy.deepcopy(self.id.blobs)
-        #self.get_transform() # update again
-        #for blob_id in blobs:
-        #    arr = blobs[blob_id].arr
-        #    for i in range(len(arr)):
-        #        x, y = arr[i]
-        #        p = np.linalg.inv(self.bTo).dot(np.transpose(np.array([x, y, 0, 1])))
-        #        p = self.mTo.dot(p)[0:2]
-        #        arr[i] = (p[0], p[1])
+        blobs = {} # blob_id:blob_objects
+        self.get_transform() # update again
+        for blob_id in self.id.blobs:
+            blobs[blob_id] = Blob(blob_id)
+            blobs[blob_id].arr = []
+            arr = self.id.blobs[blob_id].arr
+            for i in range(len(arr)):
+                x, y = arr[i]
+                p = np.linalg.inv(self.bTo).dot(np.transpose(np.array([x, y, 0, 1])))
+                p = self.mTo.dot(p)[0:2]
+                blobs[blob_id].arr.append((p[0], p[1]))
 
         self.rcvr.create_local_world(blobs)
 

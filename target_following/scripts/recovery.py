@@ -60,18 +60,11 @@ class Recovery:
         for blob_id in blobs:
             arr = blobs[blob_id].arr
             for pos_x,pos_y in arr:
-                x = cx + int(pos_x / RESO)
-                y = cy + int(pos_y / RESO)
-                print("obs at", pos_x,pos_y)
+                x = round((pos_x - (self.robot_pos.x - LIDAR_RADIUS)) / RESO)
+                y = round((pos_y - (self.robot_pos.y - LIDAR_RADIUS)) / RESO)
+                #print("obs at", x, y)
                 world_arr[x + y * world_w] = 1
 
-#        print("MAP IS")
-#        for h in range(world_h):
-#            s = "["
-#            for w in range(world_w):
-#                s += str(world_arr[w + h * world_w]) + ","
-#            s += "]"
-#            print(s)
 
         origin = Pose()
         origin.position = Point()
@@ -97,6 +90,8 @@ class Recovery:
         self.start = [self.robot_pos.x, self.robot_pos.y]
         print("finding path from ", (follower_utils.show(self.start[0]),follower_utils.show(self.start[1])), "to ",
                   (follower_utils.show(self.end[0]),follower_utils.show(self.end[1])))
+
+        print(self.world.T)
 
         # convert from map to grid; theta doesn't matter here
         start_grid_x, start_grid_y, theta = self.world.map_to_grid(self.start[0], self.start[1], 0)
@@ -126,6 +121,17 @@ class Recovery:
         if self.world.get_cell(start_cell_x, start_cell_y) or self.world.get_cell(end_cell_x, end_cell_y):
             print("inside obstacle")
             return []
+
+        #self.world.data[start_cell_x + start_cell_y * self.world.width] = 5
+        #self.world.data[end_cell_x + end_cell_y * self.world.width] = 7
+
+        #print("MAP IS")
+        #for h in range(self.world.height):
+        #    s = "["
+        #    for w in range(self.world.width):
+        #        s += str(self.world.data[w + h * self.world.width]) + ","
+        #    s += "]"
+        #    print(s)
 
         path = self.a_star()
         return self.get_path_poses(path)
