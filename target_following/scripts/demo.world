@@ -47,10 +47,43 @@ rosbot
 )
 
 # and another one
-rosbot
+rosbot2
 (
   pose [ 4.000 5.000 0.000 0.000 ]
   name "rosbot"
   color "green"
 )
+
+# obstacle 1
+obs_rosbot
+(
+  pose [ 0.500 2.800 0.000 90.000 ]
+  name "obs_rosbot"
+  color "red"
+)
+
+# obstacle 2
+obs_rosbot
+(
+  pose [ 8.300 10.200 0.000 165.000 ]
+  name "obs_rosbot"
+  color "red"
+)
+
+# obstacle 3
+obs_rosbot
+(
+  pose [ 9.500 3.000 0.000 105.000 ]
+  name "obs_rosbot"
+  color "red"
+)
+
+# obstacle 4
+obs_rosbot
+(
+  pose [ 2.500 9.000 0.000 25.000 ]
+  name "obs_rosbot"
+  color "red"
+)
+
 
