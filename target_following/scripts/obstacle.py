@@ -48,9 +48,9 @@ class Obstacle:
 			self.move()
 		
 # for testing, to call, follow same method
-#if __name__ == "__main__":
-	#o = Obstacle()
-	#o.main()
+if __name__ == "__main__":
+	o = Obstacle()
+	o.main()
 			
 			
 	

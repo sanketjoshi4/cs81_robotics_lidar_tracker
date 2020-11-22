@@ -2,10 +2,12 @@
 
 import numpy as np
 import math
+import copy
 
 import follower_utils
 from recovery import Recovery
 from identifier import Identifier
+from predictor import Predictor
 from world import World
 
 import rospy
@@ -56,6 +58,7 @@ class Robot:
         self.rcvr_poses = []  # all poses to move to in order to get to last detected target pose
         self.rcvr = None
         self.id = Identifier()
+        self.pred = Predictor()
         self.time_last_scan = None
         self.target_ever_found = False
 
@@ -104,16 +107,30 @@ class Robot:
         """ Uses laser scan to update target position """
 
         curr_time = rospy.get_time()
-        # print curr_time, self.time_last_scan
         if self.time_last_scan is None or (curr_time - self.time_last_scan > 1 / Identifier.SCAN_FREQ):
-            # print 1111
-            # Scan based on SCAN_FREQ
 
             if self.posx is not None and self.last_posx is not None:
                 self.id.blobify(laser_scan_msg, self)  # Identify blobs
                 self.id.classify(self.get_movement_transform())  # Classify blobs, set target
                 tpos, tvel = self.id.get_target_pos_vel(robot=self, frame="MAP")
                 self.display_target_status(tpos, tvel)
+
+                self.pred.update_targetpos(
+                    None if tpos is None else tpos[0],
+                    None if tpos is None else tpos[1],
+                    None if tvel is None else tvel[0],
+                    None if tvel is None else tvel[1]
+                )
+
+                # Make lookahead dynamic
+                dt = 0.04
+                # dt = 1 / Identifier.SCAN_FREQ
+                pred = self.pred.predict_hd(dt, 5)
+                if pred is not None:
+                    pred_vel, pred_poses = pred
+                    for p in pred_poses:
+                        print "Pred Pos :   ({},{})".format(
+                            follower_utils.show(p[0]), follower_utils.show(p[1]))
 
             # Update last pose to current
             self.last_posx = self.posx
@@ -130,6 +147,20 @@ class Robot:
         self.rcvr.robot_pos.y = p[1]
         self.rcvr.robot_ang = self.angle + START_YAW_MAP
 
+        # update local map
+        blobs = copy.deepcopy(self.id.blobs)
+        #self.get_transform() # update again
+        #for blob_id in blobs:
+        #    arr = blobs[blob_id].arr
+        #    for i in range(len(arr)):
+        #        x, y = arr[i]
+        #        p = np.linalg.inv(self.bTo).dot(np.transpose(np.array([x, y, 0, 1])))
+        #        p = self.mTo.dot(p)[0:2]
+        #        arr[i] = (p[0], p[1])
+
+        self.rcvr.create_local_world(blobs)
+
+
     def display_target_status(self, tpos, tvel):
         if not self.target_ever_found:
             return
@@ -143,6 +174,11 @@ class Robot:
         # 		follower_utils.show(tvel[0]), follower_utils.show(tvel[1]))
         else:
             print "Target Lost"
+
+        # print "OBS_INT: ", [(follower_utils.show(180.0 * i[0] / PI), follower_utils.show(180.0 * i[1] / PI)) for i in
+        #                     self.id.obs_intervals]
+
+        # print "OBS_INT: ", self.id.obs_intervals
 
     def move(self):
         self.rcvr = Recovery(self.map)
@@ -159,7 +195,6 @@ class Robot:
 
             tpos, tvel = self.id.get_target_pos_vel(robot=self, frame="MAP")
             self.target_ever_found = self.target_ever_found or tpos is not None
-            # self.display_target_status(tpos, tvel)
 
             # we detect target so decide how to move using PID-like function
             if tpos is not None and tvel is not None:
@@ -196,11 +231,12 @@ class Robot:
                     # we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
                     self.update_rcvr()  # remember to update Recovery object's required info first
                     self.rcvr_poses = self.rcvr.recover()
-                print("retrieved rcvr_poses", self.rcvr_poses)
+                #print("retrieved rcvr_poses", self.rcvr_poses)
 
                 # in the middle of recovery mode
                 # separate if statement so we don't have to wait until next loop iteration to start moving once entered recovery mode
                 if self.rcvr_poses:
+                    print("goal in map frame:", self.rcvr_poses[0])
                     # essentially we are moving to every position from a list that goes [[goalx, goaly], ..., [startx, starty]], if we encounter
                     # target before we finish this list i.e. state changes back to REGULAR, just clear list to prep for next recovery call
                     pose = self.rcvr_poses[-1]
@@ -222,7 +258,7 @@ class Robot:
                             self.rcvr_poses.pop()
                             continue  # no need to waste a publication
                         else:
-                            lin_x = VEL  # rotation ensures we always move forward
+                            lin_x = VEL # rotation ensures we always move forward
                     else:
                         lin_x = 0
                         if ang < 0:
@@ -251,24 +287,12 @@ class Robot:
 
         tpx = tpos[0]  # target pos x
         tpy = tpos[1]  # target pos y
+        tpz = math.atan2(self.id.target[1], self.id.target[0])
 
         tvx = tvel[0]  # target vel x
         tvy = tvel[1]  # target vel y
 
-        obs = self.id.obs
-
-        # print "RP:{},{},{}".format(follower_utils.show(rpx), follower_utils.show(rpy), follower_utils.show(rpz))
-        # print "RV:{},{},{}".format(follower_utils.show(rvx), follower_utils.show(rvy), follower_utils.show(rvz))
-        # print "TP:{},{}".format(follower_utils.show(tpx), follower_utils.show(tpy))
-        # print "TV:{},{}".format(follower_utils.show(tvx), follower_utils.show(tvy))
-
-        if self.id.target is not None:
-            # print "PID-TargetY:", self.id.target[1]
-            ang_z = self.id.target[1] * Robot.KP if self.id.target is not None else 0
-
-        dist = math.sqrt((rpx - tpx) * (rpx - tpx) + (rpy - tpy) * (rpy - tpy))
-        if dist < 0.3:
-            lin_x = 0
+        obs_intervals = self.id.obs_intervals
 
         """
         speed,  angle_of_pid <- pid_like(rp, rv, tp, tv)
@@ -281,7 +305,28 @@ class Robot:
         return angle_of_pid + angle_wiggle
         """
 
-        # (angle, vel_tuple) = self.pid_like((rpx, rpy), (rvx, rvy), (tpx, tpy), (tvx, tvy))
+        chase_angle = tpz
+
+        # TODO: switch from tpz to predicted angle once predict_hd works
+        # colliding_obs = [obs_int for obs_int in obs_intervals if obs_int[0] <= tpz <= obs_int[1]]
+        # if len(colliding_obs) > 0:
+        #     # colliding, use find tangent
+        #     min_ang_obs, max_ang_obs = colliding_obs[0]
+        #     tangent_angle = min_ang_obs if tpz - min_ang_obs < max_ang_obs - tpz else max_ang_obs
+        #
+        #     # find wiggle angle
+        #     wiggle_angle = self.get_wiggle((rvx, rvy), (tvx, tvy))
+        #
+        #     chase_angle = tangent_angle + wiggle_angle
+
+        if self.id.target is not None:
+            # print "PID-TargetY:", self.id.target[1]
+            ang_z = chase_angle * Robot.KP if self.id.target is not None else 0
+            # ang_z = self.id.target[1] * Robot.KP if self.id.target is not None else 0
+
+        dist = math.sqrt((rpx - tpx) * (rpx - tpx) + (rpy - tpy) * (rpy - tpy))
+        if dist < 0.3:
+            lin_x = 0
 
         return lin_x, ang_z
 

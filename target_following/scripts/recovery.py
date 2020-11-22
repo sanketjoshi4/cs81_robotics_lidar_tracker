@@ -1,14 +1,18 @@
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import Point, Pose, Quaternion
 from cell import Cell
 import follower_utils
 from world import World
 import heapq as hq
 import numpy as np
+import math
+import tf
 
 
 LOST_THRESH = 10 # s
 EDGE_WEIGHT = 1 # constant edge weight because everything is 1 grid square away from us, may change this
 SEARCH_RANGE = 5 # grid squares
+LIDAR_RADIUS = 2 # m
+RESO = 0.05 # m
 
 
 class Recovery:
@@ -19,8 +23,8 @@ class Recovery:
 
         # last known pose of target; right now hard-coded, but later Robot should pass this pose to Recovery object
         self.last_known_pos = Point()
-        self.last_known_pos.x = 1.65
-        self.last_known_pos.y = 7.4
+        self.last_known_pos.x = 4
+        self.last_known_pos.y = 5
 
         # robot's current pose (pose at which we adopt recovery mode)
         self.robot_pos = None
@@ -29,10 +33,59 @@ class Recovery:
         # output stats for later?
         self.elapsed_lost_time = 0
 
-        # full knowledge of world
+        # full knowledge of worldi; if None then caller must provide data to update local world before calling recover()
         self.world = world
 
         print("init done")
+
+    def create_local_world(self, blobs):
+        """
+        Construct local world from blobs dict of {blob_id:Blob()}
+        """
+        # (data, width, height, reso, frame, origin)
+        world_w = int(LIDAR_RADIUS * 2 / RESO) + 1 # account for center position where robot is
+        world_h = int(LIDAR_RADIUS * 2 / RESO) + 1
+        world_res = RESO
+        world_frame = "map"
+        
+        world_arr = np.zeros(world_w * world_h, dtype = int)
+        world_arr[:] = 2
+        cx = int(world_w / 2)
+        cy = int(world_h / 2)
+        for x in range(cx - int(LIDAR_RADIUS / RESO), cx + int(LIDAR_RADIUS / RESO) + 1):
+            for y in range(cy - int(LIDAR_RADIUS / RESO), cy + int(LIDAR_RADIUS / RESO) + 1):
+                if (x-cx)**2 + (y-cy)**2 <= (LIDAR_RADIUS / RESO)**2:
+                    world_arr[x + y * world_w] = 0
+
+        for blob_id in blobs:
+            arr = blobs[blob_id].arr
+            for pos_x,pos_y in arr:
+                x = cx + int(pos_x / RESO)
+                y = cy + int(pos_y / RESO)
+                print("obs at", pos_x,pos_y)
+                world_arr[x + y * world_w] = 1
+
+#        print("MAP IS")
+#        for h in range(world_h):
+#            s = "["
+#            for w in range(world_w):
+#                s += str(world_arr[w + h * world_w]) + ","
+#            s += "]"
+#            print(s)
+
+        origin = Pose()
+        origin.position = Point()
+        origin.position.x = self.robot_pos.x - LIDAR_RADIUS
+        origin.position.y = self.robot_pos.y - LIDAR_RADIUS
+        origin.position.z = 0
+        origin.orientation = Quaternion()
+        quaternion = tf.transformations.quaternion_from_euler(0, 0, 0)
+        origin.orientation.x = quaternion[0]
+        origin.orientation.y = quaternion[1]
+        origin.orientation.z = quaternion[2]
+        origin.orientation.w = quaternion[3]
+
+        self.world = World(world_arr, world_w, world_h, world_res, world_frame, origin)
 
     def recover(self):
         """

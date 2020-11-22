@@ -47,7 +47,7 @@ rosbot
 )
 
 # and another one
-rosbot
+rosbot2
 (
   pose [ 4.000 5.000 0.000 0.000 ]
   name "rosbot"
