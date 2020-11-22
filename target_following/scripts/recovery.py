@@ -264,10 +264,15 @@ class Recovery:
         """
         # returns 2D list where items are [x, y, yaw] in map frame
         poses = []
+        px = None
+        py = None
 
         for i in range(len(path)):
             cx = path[i].coords[0]
             cy = path[i].coords[1]
+
+            if i > 0 and (px - 1 <= cx <= px +1 or py - 1 <= cy <= py + 1):
+                continue
 
             # get x,y in grid
             grid_x, grid_y = self.world.cell_to_grid(cx, cy)
@@ -275,4 +280,8 @@ class Recovery:
             # get x,y in map; yaw doesn't matter
             map_x, map_y, map_yaw = self.world.grid_to_map(grid_x, grid_y, 0)
             poses.append([map_x, map_y])
+
+            # update prev cells
+            px = cx
+            py = cy
         return poses
