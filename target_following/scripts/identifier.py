@@ -57,10 +57,13 @@ class Identifier:
         self.last_target_vel = None
 
         self.status = None  # Amongst
+        self.blobifying = False # To track when blobify() is running
 
     def blobify(self, laser_scan_msg, robot):
         """ This updates the dict of blobs. Each blob is stored against a place holder id """
 
+        self.blobifying = True
+        
         amin = laser_scan_msg.angle_min  # Minimum angle of overall scan
         incr = laser_scan_msg.angle_increment  # Angle increment of overall scan
         arr = laser_scan_msg.ranges  # List of readings
@@ -97,6 +100,8 @@ class Identifier:
         self.obs_intervals = self.get_obstacle_intervals(obs_flag_arr, amin, incr)
 
         print ", ".join([b.show(robot) for _, b in self.blobs.items()])
+        
+        self.blobifying = False
 
     def classify(self, movement_transform):
         """ This is responsible for separating moving blobs from static ones. Saves the blob in motion as the target """
