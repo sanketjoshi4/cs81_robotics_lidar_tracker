@@ -1,7 +1,7 @@
 from geometry_msgs.msg import Point, Pose, Quaternion
 from cell import Cell
-import follower_utils
 from world import World
+import utils
 import heapq as hq
 import numpy as np
 import math
@@ -60,18 +60,11 @@ class Recovery:
         for blob_id in blobs:
             arr = blobs[blob_id].arr
             for pos_x,pos_y in arr:
-                x = cx + int(pos_x / RESO)
-                y = cy + int(pos_y / RESO)
-                print("obs at", pos_x,pos_y)
+                x = round((pos_x - (self.robot_pos.x - LIDAR_RADIUS)) / RESO)
+                y = round((pos_y - (self.robot_pos.y - LIDAR_RADIUS)) / RESO)
+                #print("obs at", x, y)
                 world_arr[x + y * world_w] = 1
 
-#        print("MAP IS")
-#        for h in range(world_h):
-#            s = "["
-#            for w in range(world_w):
-#                s += str(world_arr[w + h * world_w]) + ","
-#            s += "]"
-#            print(s)
 
         origin = Pose()
         origin.position = Point()
@@ -95,8 +88,10 @@ class Recovery:
         # assume in map frame
         self.end = [self.last_known_pos.x, self.last_known_pos.y]
         self.start = [self.robot_pos.x, self.robot_pos.y]
-        print("finding path from ", (follower_utils.show(self.start[0]),follower_utils.show(self.start[1])), "to ",
-                  (follower_utils.show(self.end[0]),follower_utils.show(self.end[1])))
+        print("finding path from ", (utils.show(self.start[0]),utils.show(self.start[1])), "to ",
+                  (utils.show(self.end[0]),utils.show(self.end[1])))
+
+        print(self.world.T)
 
         # convert from map to grid; theta doesn't matter here
         start_grid_x, start_grid_y, theta = self.world.map_to_grid(self.start[0], self.start[1], 0)
@@ -127,6 +122,17 @@ class Recovery:
             print("inside obstacle")
             return []
 
+        #self.world.data[start_cell_x + start_cell_y * self.world.width] = 5
+        #self.world.data[end_cell_x + end_cell_y * self.world.width] = 7
+
+        #print("MAP IS")
+        #for h in range(self.world.height):
+        #    s = "["
+        #    for w in range(self.world.width):
+        #        s += str(self.world.data[w + h * self.world.width]) + ","
+        #    s += "]"
+        #    print(s)
+
         path = self.a_star()
         return self.get_path_poses(path)
 
@@ -134,8 +140,8 @@ class Recovery:
         """
         Returns the nearest cell index x,y that's not within SEARCH_RANGE of an obstacle
         """
-        for ny in range(y - SEARCH_RANGE * 2, y + SEARCH_RANGE * 2 + 1):
-            for nx in range(x - SEARCH_RANGE * 2, x + SEARCH_RANGE * 2 + 1):
+        for ny in range(max(0, y - SEARCH_RANGE * 2), min(self.world.height, y + SEARCH_RANGE * 2 + 1)):
+            for nx in range(max(0, x - SEARCH_RANGE * 2), min(self.world.width, x + SEARCH_RANGE * 2 + 1)):
                 if ny != y or nx != x:
                     if not self.is_near_obs(nx, ny):
                         return nx, ny
@@ -243,8 +249,8 @@ class Recovery:
         """
         Check if cell index at x,y is near a rock, to take into account of robot size in map
         """
-        for ny in range(y - SEARCH_RANGE, y + SEARCH_RANGE + 1):
-            for nx in range(x - SEARCH_RANGE, x + SEARCH_RANGE + 1):
+        for ny in range(max(0, y - SEARCH_RANGE), min(self.world.height, y + SEARCH_RANGE + 1)):
+            for nx in range(max(0, x - SEARCH_RANGE), min(self.world.width, x + SEARCH_RANGE + 1)):
                 if nx != x or ny != y:
                     if self.world.get_cell(nx, ny): # has obstacle
                         return True
@@ -258,10 +264,15 @@ class Recovery:
         """
         # returns 2D list where items are [x, y, yaw] in map frame
         poses = []
+        px = None
+        py = None
 
         for i in range(len(path)):
             cx = path[i].coords[0]
             cy = path[i].coords[1]
+
+            if i > 0 and (px - 2 <= cx <= px + 2 != py - 2 <= cy <= py + 2):
+                continue
 
             # get x,y in grid
             grid_x, grid_y = self.world.cell_to_grid(cx, cy)
@@ -269,4 +280,8 @@ class Recovery:
             # get x,y in map; yaw doesn't matter
             map_x, map_y, map_yaw = self.world.grid_to_map(grid_x, grid_y, 0)
             poses.append([map_x, map_y])
+
+            # update prev cells
+            px = cx
+            py = cy
         return poses

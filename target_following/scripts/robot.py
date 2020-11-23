@@ -6,7 +6,7 @@ import copy
 
 import utils
 from recovery import Recovery
-from identifier import Identifier
+from identifier import Identifier, Blob
 from predictor import Predictor
 from world import World
 
@@ -50,9 +50,15 @@ class Robot:
         self.last_angle = None
 
         # useful transformation matrices for movement
-        self.mTo = np.matrix(
+        self.mTo = np.array(
             # corrected!
             [[1, 0, 0, START_X_MAP], [0, 1, 0, START_Y_MAP], [0, 0, 1, 0], [0, 0, 0, 1]])  # odom to map
+        self.trans_odom_to_map = np.mat(
+            [[1, 0, 0, START_X_MAP],
+             [0, 1, 0, START_Y_MAP],
+             [0, 0, 1, 0],
+             [0, 0, 0, 1]]
+        )
         self.bTo = None  # odom to base_link
 
         self.rcvr_poses = []  # all poses to move to in order to get to last detected target pose
@@ -131,22 +137,25 @@ class Robot:
     def update_rcvr(self):
         # update recovery with robot's current pose
         self.get_transform()  # update self.bTo first
-        p = self.mTo.dot(np.transpose(np.array([self.posx, self.posy, 0, 1])))[0:2]
+        p = self.mTo.dot(np.transpose(np.array([self.posx, self.posy, 0, 1])))
         self.rcvr.robot_pos = Point()
         self.rcvr.robot_pos.x = p[0]
         self.rcvr.robot_pos.y = p[1]
         self.rcvr.robot_ang = self.angle + START_YAW_MAP
 
         # update local map
-        blobs = copy.deepcopy(self.id.blobs)
-        #self.get_transform() # update again
-        #for blob_id in blobs:
-        #    arr = blobs[blob_id].arr
-        #    for i in range(len(arr)):
-        #        x, y = arr[i]
-        #        p = np.linalg.inv(self.bTo).dot(np.transpose(np.array([x, y, 0, 1])))
-        #        p = self.mTo.dot(p)[0:2]
-        #        arr[i] = (p[0], p[1])
+        blobs_cp = copy.deepcopy(self.id.blobs)
+        blobs = {}  # blob_id:blob_objects
+        self.get_transform()  # update again
+        for blob_id in blobs_cp:
+            blobs[blob_id] = Blob(blob_id)
+            blobs[blob_id].arr = []
+            arr = blobs_cp[blob_id].arr
+            for i in range(len(arr)):
+                x, y = arr[i]
+                p = np.linalg.inv(self.bTo).dot(np.transpose(np.array([x, y, 0, 1])))
+                p = self.mTo.dot(p)[0:2]
+                blobs[blob_id].arr.append((p[0], p[1]))
 
         self.rcvr.create_local_world(blobs)
 
@@ -156,9 +165,9 @@ class Robot:
 
         print "{}".format(''.join(['-' for _ in range(100)]))
         if tpos is not None:
-            print "Target Pos : ({},{})".format(utils.show(tpos[0]), utils.show(tpos[1]))
+            print "Target Pos      : ({},{})".format(utils.show(tpos[0]), utils.show(tpos[1]))
         if tvel is not None:
-            print "Target Vel : ({},{})".format(utils.show(tvel[0]), utils.show(tvel[1]))
+            print "Target Vel      : ({},{})".format(utils.show(tvel[0]), utils.show(tvel[1]))
         else:
             print "Target Lost"
 
@@ -182,7 +191,7 @@ class Robot:
             if tpos is not None and tvel is not None:
 
                 self.pub_visibility(True)  # can see the target
-                lin_x, ang_z = self.chase(tpos, tvel)
+                lin_x, ang_z = self.chase()
 
                 # recovery object will always have last known target pose to prepare for recovery mode
                 tpos_map, tvel_map = self.id.get_target_pos_vel(robot=self, frame="MAP")
@@ -206,19 +215,21 @@ class Robot:
             else:  # target is out of sight, go into recovery mode
                 # continue
 
-                print "In Recovery : {}".format(self.rcvr_poses)
+                print "In Recovery : ", (
+                    ", ".join(["({},{})".format(utils.show(p[0]), utils.show(p[1])) for p in self.rcvr_poses]))
                 self.pub_visibility(False)  # cant see the target
 
                 if not self.rcvr_poses:
                     # we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
                     self.update_rcvr()  # remember to update Recovery object's required info first
                     self.rcvr_poses = self.rcvr.recover()
-                #print("retrieved rcvr_poses", self.rcvr_poses)
+                # print("retrieved rcvr_poses", self.rcvr_poses)
 
                 # in the middle of recovery mode
                 # separate if statement so we don't have to wait until next loop iteration to start moving once entered recovery mode
                 if self.rcvr_poses:
-                    print("goal in map frame:", self.rcvr_poses[0])
+                    print "goal in map frame: ({},{})".format(utils.show(self.rcvr_poses[0][0]),
+                                                              utils.show(self.rcvr_poses[0][1]))
                     # essentially we are moving to every position from a list that goes [[goalx, goaly], ..., [startx, starty]], if we encounter
                     # target before we finish this list i.e. state changes back to REGULAR, just clear list to prep for next recovery call
                     pose = self.rcvr_poses[-1]
@@ -240,7 +251,7 @@ class Robot:
                             self.rcvr_poses.pop()
                             continue  # no need to waste a publication
                         else:
-                            lin_x = VEL # rotation ensures we always move forward
+                            lin_x = VEL  # rotation ensures we always move forward
                     else:
                         lin_x = 0
                         if ang < 0:
@@ -255,102 +266,67 @@ class Robot:
             self.pub.publish(vel_msg)
             rate.sleep()
 
-    def chase(self, tpos, tvel):
+    def chase(self):
+
+        # TODO: Remove unused variables once done and tested
         lin_x = VEL
         ang_z = 0.0
-
-        rpx = self.posx  # robot pos x
-        rpy = self.posy  # robot pos y
-        rpz = self.angle  # robot angle
-
-        rvx = (self.posx - self.last_posx) * Identifier.SCAN_FREQ  # robot vel x
-        rvy = (self.posy - self.last_posy) * Identifier.SCAN_FREQ  # robot vel y
-        rvz = (self.angle - self.last_angle) * Identifier.SCAN_FREQ  # robot ang vel
-
-        tpx = tpos[0]  # target pos x
-        tpy = tpos[1]  # target pos y
-        tpz = math.atan2(self.id.target[1], self.id.target[0])
-
-        tvx = tvel[0]  # target vel x
-        tvy = tvel[1]  # target vel y
-
+        target_angle_base = math.atan2(self.id.target[1], self.id.target[0])
         obs_intervals = self.id.obs_intervals
 
-        """
-        speed,  angle_of_pid <- pid_like(rp, rv, tp, tv)
-        if not obs @ angle_of_pid:
-            return angle_of_pid
-        angle_left <- search left
-        angle_right <- search left
-        angle_of_tangent <- min (a_L,a_R)
-        angle_wiggle <- angle + get_wiggle() # angle diff in robot and target vels
-        return angle_of_pid + angle_wiggle
-        """
-
-        chase_angle = tpz
+        # init chase angle
+        chase_angle = target_angle_base
+        print "target angle    : ", utils.show(chase_angle)
 
         # TODO: Adjust dt and lookahead, find better way to define
+        # Incorporate predicted robot position into chase angle
         dt = 0.04
-        lookahead = 5
+        lookahead = 2
         pred = self.pred.predict_hd(dt, lookahead)
         if pred is not None and pred[1] is not None:
             last_pred_map = pred[1][-1]
-            last_pred_base = utils.map_to_base(last_pred_map, self.mTo, (self.posx, self.posy, self.angle))
+            last_pred_base = utils.map_to_base(last_pred_map, self.trans_odom_to_map,
+                                               (self.posx, self.posy, self.angle))
             chase_angle = last_pred_base[1]
+            print "predicted angle : ", utils.show(chase_angle)
 
-        # TODO: handle collisions
-        # colliding_obs = [obs_int for obs_int in obs_intervals if obs_int[0] <= tpz <= obs_int[1]]
-        # if len(colliding_obs) > 0:
-        #     # colliding, use find tangent
-        #     min_ang_obs, max_ang_obs = colliding_obs[0]
-        #     tangent_angle = min_ang_obs if tpz - min_ang_obs < max_ang_obs - tpz else max_ang_obs
-        #
-        #     # find wiggle angle
-        #     wiggle_angle = self.get_wiggle((rvx, rvy), (tvx, tvy))
-        #
-        #     chase_angle = tangent_angle + wiggle_angle
+        # Incorporate obstacles into chase angle
+        robot_width_angle = 0.1
+        colliding_obs = [obs_int for obs_int in obs_intervals if
+                         obs_int[0] - robot_width_angle <= chase_angle <= obs_int[1] + robot_width_angle]
+
+        if len(colliding_obs) > 0:
+            # colliding, use find tangent
+            min_ang_obs, max_ang_obs = colliding_obs[0]
+
+            if math.fabs(chase_angle - target_angle_base) < 0.2:
+                # print "target is the obstacle"
+                pass
+            else:
+                print "obs             @ <{}|{}>".format(utils.show(min_ang_obs), utils.show(max_ang_obs))
+                go_min_side = math.fabs(chase_angle - min_ang_obs) < math.fabs(chase_angle - max_ang_obs)
+                tangent_angle = min_ang_obs if go_min_side else max_ang_obs
+                print "tangent angle   : {}".format(utils.show(tangent_angle))
+
+                # Add wiggle room
+                # TODO: Does the wiggle function provide substantial benefit over constant wiggle? Is it needed?
+                wiggle_angle = 0.1 * (-1 if go_min_side else 1)
+                # wiggle_angle = self.get_wiggle((rvx, rvy), (tvx, tvy))
+                print "wiggle angle    : {}".format(utils.show(wiggle_angle))
+                # wiggle_angle = 0
+                chase_angle = tangent_angle + wiggle_angle
+                print "final angle     : ", utils.show(chase_angle)
 
         if self.id.target is not None:
             ang_z = chase_angle * Robot.KP if self.id.target is not None else 0
 
-        dist = math.sqrt((rpx - tpx) * (rpx - tpx) + (rpy - tpy) * (rpy - tpy))
-        if dist < 0.3:
+        dist = math.sqrt(self.id.target[0] * self.id.target[0] + self.id.target[1] * self.id.target[1])
+        print "dist            : ", utils.show(dist)
+        # TODO: Get linvel from a pid function to avoid collision with target
+        if dist < 0.5:
             lin_x = 0
 
         return lin_x, ang_z
-
-    def pid_like(self, rp, rv, tp, tv):
-        """
-            pid_like :: (rp, rv, tp, tv) -> angle
-            split into x and y
-            consider from the target's frame of ref
-            get the dx and dy
-            convert back to robot's frame
-        """
-        # getting individual components, assuming rv and tv are tuples (rv is robot velocity, tv is predicted target velocity)
-        xrv = rv[0]
-        yrv = rv[1]
-        xtv = tv[0]
-        ytv = tv[1]
-        # rp is robot position, tp is target position
-        xrp = rp[0]
-        yrp = rp[1]
-        xtp = tp[0]
-        ytp = tp[1]
-        # direct velocity
-        diff_x = xtp - xrp
-        diff_y = ytp - yrp
-        # normalizing difference, this produces the direct velocity to the target from the robot (aka, this produces
-        # a normalized velocity in the direction of the target's current position from the robot's current position)
-        direct_velx = diff_x / (math.pow(diff_x, 2) + math.pow(diff_y, 2))
-        direct_vely = diff_y / (math.pow(diff_x, 2) + math.pow(diff_y, 2))
-
-        # averaging the direct velocities and the predicted velocities
-        robot_velx = (xtv + direct_velx) / 2
-        robot_vely = (ytv + direct_vely) / 2
-        vel_tuple = (robot_velx, robot_vely)
-        angle = math.atan2(robot_vely, robot_velx)
-        return (angle, vel_tuple)
 
     def get_wiggle(self, rv, tv):
         """
