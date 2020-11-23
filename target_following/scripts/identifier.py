@@ -96,7 +96,7 @@ class Identifier:
         obs_flag_arr = [i < Identifier.LASER_RANGE for i in arr]
         self.obs_intervals = self.get_obstacle_intervals(obs_flag_arr, amin, incr)
 
-        # print [b.show(robot) for _, b in self.blobs.items()]
+        print ", ".join([b.show(robot) for _, b in self.blobs.items()])
 
     def classify(self, movement_transform):
         """ This is responsible for separating moving blobs from static ones. Saves the blob in motion as the target """

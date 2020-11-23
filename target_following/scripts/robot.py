@@ -18,7 +18,7 @@ from nav_msgs.msg import OccupancyGrid, Odometry
 from std_msgs.msg import Bool
 from sensor_msgs.msg import LaserScan
 
-CMD_FREQ = 10  # Hz
+CMD_FREQ = 1  # Hz
 SLEEP = 2  # secs
 VEL = 0.2  # m/s
 
@@ -156,9 +156,9 @@ class Robot:
 
         print "{}".format(''.join(['-' for _ in range(100)]))
         if tpos is not None:
-            print "Target Pos : ({},{})".format(utils.show(tpos[0]), utils.show(tpos[1]))
+            print "Target Pos      : ({},{})".format(utils.show(tpos[0]), utils.show(tpos[1]))
         if tvel is not None:
-            print "Target Vel : ({},{})".format(utils.show(tvel[0]), utils.show(tvel[1]))
+            print "Target Vel      : ({},{})".format(utils.show(tvel[0]), utils.show(tvel[1]))
         else:
             print "Target Lost"
 
@@ -182,7 +182,7 @@ class Robot:
             if tpos is not None and tvel is not None:
 
                 self.pub_visibility(True)  # can see the target
-                lin_x, ang_z = self.chase(tpos, tvel)
+                lin_x, ang_z = self.chase()
 
                 # recovery object will always have last known target pose to prepare for recovery mode
                 tpos_map, tvel_map = self.id.get_target_pos_vel(robot=self, frame="MAP")
@@ -255,31 +255,17 @@ class Robot:
             self.pub.publish(vel_msg)
             rate.sleep()
 
-    def chase(self, tpos, tvel):
+    def chase(self):
 
         # TODO: Remove unused variables once done and tested
         lin_x = VEL
         ang_z = 0.0
-
-        rpx = self.posx  # robot pos x
-        rpy = self.posy  # robot pos y
-        rpz = self.angle  # robot angle
-
-        rvx = (self.posx - self.last_posx) * Identifier.SCAN_FREQ  # robot vel x
-        rvy = (self.posy - self.last_posy) * Identifier.SCAN_FREQ  # robot vel y
-        rvz = (self.angle - self.last_angle) * Identifier.SCAN_FREQ  # robot ang vel
-
-        tpx = tpos[0]  # target pos x
-        tpy = tpos[1]  # target pos y
-        tpz = math.atan2(self.id.target[1], self.id.target[0])
-
-        tvx = tvel[0]  # target vel x
-        tvy = tvel[1]  # target vel y
-
+        target_angle_base = math.atan2(self.id.target[1], self.id.target[0])
         obs_intervals = self.id.obs_intervals
 
         # init chase angle
-        chase_angle = tpz
+        chase_angle = target_angle_base
+        print "target angle    : ", utils.show(chase_angle)
 
         # TODO: Adjust dt and lookahead, find better way to define
         # Incorporate predicted robot position into chase angle
@@ -290,6 +276,7 @@ class Robot:
             last_pred_map = pred[1][-1]
             last_pred_base = utils.map_to_base(last_pred_map, self.mTo, (self.posx, self.posy, self.angle))
             chase_angle = last_pred_base[1]
+            print "predicted angle : ", utils.show(chase_angle)
 
         # Incorporate obstacles into chase angle
         robot_width_angle = 0.1
@@ -300,29 +287,33 @@ class Robot:
             # colliding, use find tangent
             min_ang_obs, max_ang_obs = colliding_obs[0]
 
-            if math.fabs(chase_angle - tpz) < 0.2:
+            if math.fabs(chase_angle - target_angle_base) < 0.2:
                 # print "target is the obstacle"
                 pass
             else:
-                # print "obs @ < {} | {} >".format(utils.show(min_ang_obs), utils.show(max_ang_obs))
-                go_min_side = tpz - min_ang_obs < max_ang_obs - tpz
-                tangent_angle = min_ang_obs if go_min_side - tpz else max_ang_obs
-                # print "tangent angle : {}".format(utils.show(tangent_angle))
+                print "obs             @ <{}|{}>".format(utils.show(min_ang_obs), utils.show(max_ang_obs))
+                go_min_side = math.fabs(chase_angle - min_ang_obs) < math.fabs(chase_angle - max_ang_obs)
+                tangent_angle = min_ang_obs if go_min_side else max_ang_obs
+                print "tangent angle   : {}".format(utils.show(tangent_angle))
+
                 # Add wiggle room
                 # TODO: Does the wiggle function provide substantial benefit over constant wiggle? Is it needed?
                 wiggle_angle = 0.1 * (-1 if go_min_side else 1)
                 # wiggle_angle = self.get_wiggle((rvx, rvy), (tvx, tvy))
-                # print "wiggle angle : {}".format(utils.show(wiggle_angle))
+                print "wiggle angle    : {}".format(utils.show(wiggle_angle))
                 # wiggle_angle = 0
                 chase_angle = tangent_angle + wiggle_angle
+                print "final angle     : ", utils.show(chase_angle)
 
         if self.id.target is not None:
             ang_z = chase_angle * Robot.KP if self.id.target is not None else 0
 
-        dist = math.sqrt((rpx - tpx) * (rpx - tpx) + (rpy - tpy) * (rpy - tpy))
-
+        dist = math.sqrt(self.id.target[0] * self.id.target[0] + self.id.target[1] * self.id.target[1])
+        print "dist            : ", utils.show(dist)
         # TODO: Get linvel from a pid function to avoid collision with target
-        if dist < 0.3:
+        if dist < 0.8:
+            lin_x = VEL * 0.5
+        elif dist < 0.3:
             lin_x = 0
 
         return lin_x, ang_z

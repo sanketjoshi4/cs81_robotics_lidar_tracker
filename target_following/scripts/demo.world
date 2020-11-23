@@ -22,7 +22,7 @@ interval_sim 10  # simulation timestep in milliseconds
 
 window
 (
-  size [ 804 895 ]
+  size [ 928 905 ]
   center [ 5.361 5.182 ]
   rotate [ 0.000 0.000 ]
   scale 74.003

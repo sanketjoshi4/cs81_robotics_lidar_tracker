@@ -1,7 +1,7 @@
 from geometry_msgs.msg import Point, Pose, Quaternion
 from cell import Cell
-import follower_utils
 from world import World
+import utils
 import heapq as hq
 import numpy as np
 import math
@@ -95,8 +95,8 @@ class Recovery:
         # assume in map frame
         self.end = [self.last_known_pos.x, self.last_known_pos.y]
         self.start = [self.robot_pos.x, self.robot_pos.y]
-        print("finding path from ", (follower_utils.show(self.start[0]),follower_utils.show(self.start[1])), "to ",
-                  (follower_utils.show(self.end[0]),follower_utils.show(self.end[1])))
+        print("finding path from ", (utils.show(self.start[0]),utils.show(self.start[1])), "to ",
+                  (utils.show(self.end[0]),utils.show(self.end[1])))
 
         # convert from map to grid; theta doesn't matter here
         start_grid_x, start_grid_y, theta = self.world.map_to_grid(self.start[0], self.start[1], 0)
