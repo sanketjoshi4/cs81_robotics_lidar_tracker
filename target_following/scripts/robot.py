@@ -9,6 +9,7 @@ from recovery import Recovery
 from identifier import Identifier, Blob
 from predictor import Predictor
 from world import World
+from metrics import Metrics
 
 import rospy
 import tf
@@ -18,11 +19,12 @@ from nav_msgs.msg import OccupancyGrid, Odometry
 from std_msgs.msg import Bool
 from sensor_msgs.msg import LaserScan
 
+PI = np.pi
+SIMULATION_TIME = 100
+
 CMD_FREQ = 10  # Hz
 SLEEP = 2  # secs
 VEL = 0.2  # m/s
-
-PI = np.pi
 
 # TODO : Figure out a better way to code robot's start pose .. env vars?
 START_X_MAP = 3.0  # Would change as per the map
@@ -75,6 +77,7 @@ class Robot:
         self.sub_laser = rospy.Subscriber("robot_0/base_scan", LaserScan, self.laser_scan_callback, queue_size=1)
         self.lis = tf.TransformListener()
 
+        self.metrics = Metrics()
         rospy.sleep(SLEEP)
 
     def odom_callback(self, msg):
@@ -180,7 +183,8 @@ class Robot:
 
         start_time = rospy.get_time()
 
-        while not rospy.is_shutdown():
+        while not rospy.is_shutdown() and rospy.get_time() - start_time < SIMULATION_TIME:
+
             lin_x = 0
             ang_z = 0
 
@@ -204,11 +208,13 @@ class Robot:
                     self.rcvr_poses = []
 
             elif rospy.get_time() - start_time < Identifier.ID_INIT_TIME:
-                self.pub_visibility(True)
+                self.pub_visibility(False)
+                self.metrics.feed(rospy.get_time())
                 continue
 
             elif not self.target_ever_found:
-                self.pub_visibility(True)
+                self.pub_visibility(False)
+                self.metrics.feed(rospy.get_time())
                 continue
 
             # elif self.rcvr is not None:  # target is out of sight, go into recovery mode
@@ -218,6 +224,7 @@ class Robot:
                 print "In Recovery : ", (
                     ", ".join(["({},{})".format(utils.show(p[0]), utils.show(p[1])) for p in self.rcvr_poses]))
                 self.pub_visibility(False)  # cant see the target
+                self.metrics.feed(rospy.get_time())
 
                 if not self.rcvr_poses:
                     # we delete as we go and clear when switch state so should be empty upon switch to RECOVERY
@@ -265,6 +272,10 @@ class Robot:
             # vel_msg.angular.z = 0
             self.pub.publish(vel_msg)
             rate.sleep()
+
+        vel_msg.linear.x = 0
+        vel_msg.angular.z = 0
+        self.pub.publish(vel_msg)
 
     def chase(self):
 
@@ -326,6 +337,8 @@ class Robot:
         if dist < 0.5:
             lin_x = 0
 
+        self.metrics.feed(rospy.get_time(), dist)
+
         return lin_x, ang_z
 
     def get_wiggle(self, rv, tv):
@@ -368,3 +381,4 @@ if __name__ == "__main__":
     # we'll probably set up target like this from main.py?
     r = Robot()
     r.move()
+    r.metrics.generate()
