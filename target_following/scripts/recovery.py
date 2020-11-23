@@ -271,7 +271,7 @@ class Recovery:
             cx = path[i].coords[0]
             cy = path[i].coords[1]
 
-            if i > 0 and (px - 1 <= cx <= px +1 or py - 1 <= cy <= py + 1):
+            if i > 0 and (px - 2 <= cx <= px + 2 or py - 2 <= cy <= py + 2):
                 continue
 
             # get x,y in grid
