@@ -14,8 +14,8 @@ try:
             x1 = [d[0] for d in output]
             y1 = [d[1] for d in output]
             plt.plot(x1, y1, label="Dist")
-            plt.xlabel('dist (m)')
-            plt.ylabel('time (sec)')
+            plt.xlabel('time (sec)')
+            plt.ylabel('dist (m)')
             plt.title('Target distance vs time')
             plt.legend()
 
