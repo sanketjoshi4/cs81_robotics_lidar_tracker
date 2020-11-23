@@ -6,7 +6,7 @@ import copy
 
 import utils
 from recovery import Recovery
-from identifier import Identifier
+from identifier import Identifier, Blob
 from predictor import Predictor
 from world import World
 
@@ -18,7 +18,7 @@ from nav_msgs.msg import OccupancyGrid, Odometry
 from std_msgs.msg import Bool
 from sensor_msgs.msg import LaserScan
 
-CMD_FREQ = 1  # Hz
+CMD_FREQ = 10  # Hz
 SLEEP = 2  # secs
 VEL = 0.2  # m/s
 
@@ -50,9 +50,15 @@ class Robot:
         self.last_angle = None
 
         # useful transformation matrices for movement
-        self.mTo = np.matrix(
+        self.mTo = np.array(
             # corrected!
             [[1, 0, 0, START_X_MAP], [0, 1, 0, START_Y_MAP], [0, 0, 1, 0], [0, 0, 0, 1]])  # odom to map
+        self.trans_odom_to_map = np.mat(
+            [[1, 0, 0, START_X_MAP],
+             [0, 1, 0, START_Y_MAP],
+             [0, 0, 1, 0],
+             [0, 0, 0, 1]]
+        )
         self.bTo = None  # odom to base_link
 
         self.rcvr_poses = []  # all poses to move to in order to get to last detected target pose
@@ -131,22 +137,25 @@ class Robot:
     def update_rcvr(self):
         # update recovery with robot's current pose
         self.get_transform()  # update self.bTo first
-        p = self.mTo.dot(np.transpose(np.array([self.posx, self.posy, 0, 1])))[0:2]
+        p = self.mTo.dot(np.transpose(np.array([self.posx, self.posy, 0, 1])))
         self.rcvr.robot_pos = Point()
         self.rcvr.robot_pos.x = p[0]
         self.rcvr.robot_pos.y = p[1]
         self.rcvr.robot_ang = self.angle + START_YAW_MAP
 
         # update local map
-        blobs = copy.deepcopy(self.id.blobs)
-        # self.get_transform() # update again
-        # for blob_id in blobs:
-        #    arr = blobs[blob_id].arr
-        #    for i in range(len(arr)):
-        #        x, y = arr[i]
-        #        p = np.linalg.inv(self.bTo).dot(np.transpose(np.array([x, y, 0, 1])))
-        #        p = self.mTo.dot(p)[0:2]
-        #        arr[i] = (p[0], p[1])
+        blobs_cp = copy.deepcopy(self.id.blobs)
+        blobs = {}  # blob_id:blob_objects
+        self.get_transform()  # update again
+        for blob_id in blobs_cp:
+            blobs[blob_id] = Blob(blob_id)
+            blobs[blob_id].arr = []
+            arr = blobs_cp[blob_id].arr
+            for i in range(len(arr)):
+                x, y = arr[i]
+                p = np.linalg.inv(self.bTo).dot(np.transpose(np.array([x, y, 0, 1])))
+                p = self.mTo.dot(p)[0:2]
+                blobs[blob_id].arr.append((p[0], p[1]))
 
         self.rcvr.create_local_world(blobs)
 
@@ -206,7 +215,8 @@ class Robot:
             else:  # target is out of sight, go into recovery mode
                 # continue
 
-                print "In Recovery : {}".format(self.rcvr_poses)
+                print "In Recovery : ", (
+                    ", ".join(["({},{})".format(utils.show(p[0]), utils.show(p[1])) for p in self.rcvr_poses]))
                 self.pub_visibility(False)  # cant see the target
 
                 if not self.rcvr_poses:
@@ -218,7 +228,8 @@ class Robot:
                 # in the middle of recovery mode
                 # separate if statement so we don't have to wait until next loop iteration to start moving once entered recovery mode
                 if self.rcvr_poses:
-                    print("goal in map frame:", self.rcvr_poses[0])
+                    print "goal in map frame: ({},{})".format(utils.show(self.rcvr_poses[0][0]),
+                                                              utils.show(self.rcvr_poses[0][1]))
                     # essentially we are moving to every position from a list that goes [[goalx, goaly], ..., [startx, starty]], if we encounter
                     # target before we finish this list i.e. state changes back to REGULAR, just clear list to prep for next recovery call
                     pose = self.rcvr_poses[-1]
@@ -270,11 +281,12 @@ class Robot:
         # TODO: Adjust dt and lookahead, find better way to define
         # Incorporate predicted robot position into chase angle
         dt = 0.04
-        lookahead = 5
+        lookahead = 2
         pred = self.pred.predict_hd(dt, lookahead)
         if pred is not None and pred[1] is not None:
             last_pred_map = pred[1][-1]
-            last_pred_base = utils.map_to_base(last_pred_map, self.mTo, (self.posx, self.posy, self.angle))
+            last_pred_base = utils.map_to_base(last_pred_map, self.trans_odom_to_map,
+                                               (self.posx, self.posy, self.angle))
             chase_angle = last_pred_base[1]
             print "predicted angle : ", utils.show(chase_angle)
 
@@ -311,9 +323,7 @@ class Robot:
         dist = math.sqrt(self.id.target[0] * self.id.target[0] + self.id.target[1] * self.id.target[1])
         print "dist            : ", utils.show(dist)
         # TODO: Get linvel from a pid function to avoid collision with target
-        if dist < 0.8:
-            lin_x = VEL * 0.5
-        elif dist < 0.3:
+        if dist < 0.5:
             lin_x = 0
 
         return lin_x, ang_z

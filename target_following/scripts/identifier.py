@@ -208,13 +208,13 @@ class Identifier:
         target_pos = Identifier.get_pos(
             target=self.target,
             robot_x=robot.posx, robot_y=robot.posy, robot_angle=robot.angle,
-            trans_odom_to_map=robot.mTo, frame=frame
+            trans_odom_to_map=robot.trans_odom_to_map, frame=frame
         )
 
         last_target_pos = Identifier.get_pos(
             target=self.last_target,
             robot_x=robot.last_posx, robot_y=robot.last_posy, robot_angle=robot.last_angle,
-            trans_odom_to_map=robot.mTo, frame=frame
+            trans_odom_to_map=robot.trans_odom_to_map, frame=frame
         )
 
         if self.last_target is None:
@@ -277,7 +277,7 @@ class Blob:
         mean_map = Identifier.get_pos(
             target=self.mean,
             robot_x=robot.posx, robot_y=robot.posy, robot_angle=robot.angle,
-            trans_odom_to_map=robot.mTo, frame="MAP"
+            trans_odom_to_map=robot.trans_odom_to_map, frame="MAP"
         )
         return "{}:[{}]@({},{})".format(self.id,
                                         utils.show(self.size),
