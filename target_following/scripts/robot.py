@@ -146,6 +146,9 @@ class Robot:
         self.rcvr.robot_pos.y = p[1]
         self.rcvr.robot_ang = self.angle + START_YAW_MAP
 
+        while self.id.blobifying: # dict size may change while this flag is true
+            continue
+
         # update local map
         blobs_cp = copy.deepcopy(self.id.blobs)
         blobs = {}  # blob_id:blob_objects
@@ -292,7 +295,7 @@ class Robot:
         # TODO: Adjust dt and lookahead, find better way to define
         # Incorporate predicted robot position into chase angle
         dt = 0.04
-        lookahead = 2
+        lookahead = 5
         pred = self.pred.predict_hd(dt, lookahead)
         if pred is not None and pred[1] is not None:
             last_pred_map = pred[1][-1]
