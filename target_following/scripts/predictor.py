@@ -53,7 +53,7 @@ class Predictor:
 
 		# if there is nothing in the poses list, simply returning
 		if len(self.poses)<1:
-			return None
+			return []
 
 		last_obs = self.poses[-1]
 		if len(self.poses) > 1:
@@ -81,9 +81,9 @@ class Predictor:
 	# more advanced version of prediiction 
 	def predict_hd(self, dt, lookahead):
 
-		# skipping if there is nothing in the list and therefore returning None for predict
+		# skipping if there is nothing in the list and therefore returning empty list of poses for predict
 		if len(self.poses)<1:
-			return None
+			return []
 
 		total_xthird = 0
 		total_ythird = 0
@@ -103,57 +103,80 @@ class Predictor:
 			avg_xthird = random.uniform(-1, 1)
 			avg_ythird = random.uniform(-1, 1)
 
+		# these above average_third values are jerk values that will be used for the next prediction
+
 		last_obs = self.poses[-1]
 		# if the there are more observations in the list, having the predicted values be 'integrals'
+		predposes = []	
+		predvel = []
+		predacc = []
 		if len(self.poses) >= 2:
-		# getting predicted accelerations
+			# creating projected poses, adding the first one
 			new_xaccel = last_obs.get_xaccel() + avg_xthird
 			new_yaccel = last_obs.get_yaccel() + avg_ythird
 			# predicted velocities
-			predx_vel = last_obs.get_xvel() + new_xaccel
-			predy_vel = last_obs.get_yvel() + new_yaccel
-			
+			self.predx_vel = last_obs.get_xvel() + new_xaccel
+			self.predy_vel = last_obs.get_yvel() + new_yaccel
+			# normalizing if either of the velocities are greater than one
+			(nx, ny) = self.normalize(self.predx_vel, self.predy_vel)
+			self.predx_vel = nx
+			self.predy_vel = ny
+			predacc.append( (new_xaccel, new_yaccel) ) 
+					
 		else: # using the last velocity until enough observations
-			predx_vel = last_obs.get_xvel()
-			predy_vel = last_obs.get_yvel() 
-		
-		# normalizing the velocity, since the max is 1 m/s
-		self.predx_vel = 0 if predx_vel == predy_vel == 0 else predx_vel / (
-					predx_vel * predx_vel + predy_vel * predy_vel)
-		self.predy_vel = 0 if predx_vel == predy_vel == 0 else predy_vel / (
-					predx_vel * predx_vel + predy_vel * predy_vel)
-		predtuple = (self.predx_vel, self.predy_vel)
-		
-		predposes = []		
-		i = 0
-		while i < lookahead:
-			xnew = last_obs.get_posx() + (i+1)*self.predx_vel*dt
-			ynew = last_obs.get_posy() + (i+1)*self.predy_vel*dt
-			predposes.append( (xnew, ynew) )		
-			i += 1
-		# returning the predicted velocities in the tuple and the next N poses
-		return (predtuple, predposes)
+			# just using the last observations velocity as the predicted
+			self.predx_vel = last_obs.get_xvel()
+			self.predy_vel = last_obs.get_yvel()
+			predacc.append( (0, 0) )
 
-			
+		# creating velocities and x
+		xnew = last_obs.get_posx() + self.predx_vel*dt
+		ynew = last_obs.get_posy() + self.predy_vel*dt
+		# appending to poses and velocities
+		predposes.append( (xnew, ynew) )
+		predvel.append( (self.predx_vel, self.predy_vel) )
+		
+	
+		i = 0
+		#already looked ahead once, looking ahead again
+		while i < lookahead-1: 
+			# adding previously predicted acc to the jerk 
+			new_xaccel = predacc[i][0] + avg_xthird
+			new_yaccel = predacc[i][1] + avg_ythird
+			predacc.append( (new_xaccel, new_yaccel) ) 
+			# getting new velocities
+			predx_vel = predvel[i][0] + new_xaccel
+			predy_vel = predvel[i][1] + new_yaccel
+			# normalizing velocities
+			(nvx, nvy) = self.normalize(predx_vel, predy_vel)
+			predvel.append( (nvx, nvy) )
+			# predicting new pose
+			xnew = predposes[i][0] + nvx*dt
+			ynew = predposes[i][1] + nvy*dt
+			predposes.append( (xnew, ynew) )
+			i += 1
+
+		# returning the predicted velocities in the tuple and the next N poses
+		print predposes
+		return  predposes
+
+	# function that normalizes velocity
+	def normalize(self, x, y):
+		if x > 1 or y > 1:
+			newx = x / ( x * x + y * y)
+			newy = y / ( x * x + y * y)
+			return (newx, newy)
+		else: 
+			return (x, y)
 		
 
 	#def main(self):
 		#while not rospy.is_shutdown():
 			#self.update_targetpos(1, 1, 1, 0)
-			#self.predict_hd(0.1)
-			#print self.poses
-			#self.update_targetpos(None, 1, 0, 1)
-			#self.predict_hd(0.1)
-			#print self.poses
-			#self.update_targetpos(2, 2, None, None)
-			#self.predict_hd(0.1)
-			#print self.poses
-			#self.update_targetpos(2, 2, None, None)
-			#self.predict_hd(0.1)
-			#print self.poses
+			#self.predict_hd(0.1, 5)
+			#self.predict_hd(0.1, 5)
 			#self.update_targetpos(0, 0, 1, 1)
-			#self.predict_hd(0.1)
-			#print self.poses
+			#self.predict_hd(0.1, 5)
 
 			#break
 
