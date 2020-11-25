@@ -45,7 +45,7 @@ class Target:
 		self.angle = 0 # current pose angle
 
 		# used for modes 2 and 3
-		self.distance_front = 0 # current distance in front of the target, based on the laser sensor readings  
+		self.distance_front = None # current distance in front of the target, based on the laser sensor readings  
 		self.distance_frontangle = None # angle at which the minimum distance is
 		self.turn_direction = 0 # left if 0, right if 1
 		self.state = 0 # if the target is moving according to the model, 1 if the target has an obstacle nearby
@@ -53,6 +53,8 @@ class Target:
 		self.vel_msg = Twist() # creating inital publish message, which is altered in the main
 
 		self.is_lost = 0 #1 if the robot is lost from the target
+		self.prev_state = 0
+		self.start_loss_time = 0 # the start time of the loss
 		self.done = 0 #1 if all the points have been traversed
 		self.time_lost = 0
 
@@ -60,15 +62,18 @@ class Target:
 		self.prev_accel = 0 
 		self.prev_angvel = 0
 
+		rospy.sleep(Target.SLEEP)
 		#rospy.sleep(2)
 
 	def visibility_callback(self, msg):
 		# if lost,
-		print msg.data
 		if msg.data==False:
+			# setting the previous state to be whatever it was before
+			self.prev_state = self.is_lost
 			self.is_lost=1
 		# if not lost,
 		else:
+			self.prev_state = self.is_lost
 			self.is_lost=0
 
 	# from Archita pa1, modified slightly
@@ -192,66 +197,88 @@ class Target:
 
 			# if in the hardcoded mode
 			if self.mode==1:
+			
+				t = rospy.get_rostime().to_sec()
+				#print t
+				#print self.time_lost
+
+				# if the target is lost, get the time it was first lost and also stop moving 
+				#if self.is_lost==1:
+					#if self.prev_state==0:
+						#time = rospy.get_rostime()
+						#self.start_loss_time = time.to_sec()
+					#print "is lost"
+					#self.vel_msg.angular.z = 0 #Target.ANGVELOCITY*1.5
+					#self.vel_msg.linear.x = 0
+					#self.pub.publish(self.vel_msg)
+					#continue
+				#if self.is_lost==0 and self.prev_state==1: # if previously lost but now found, subtract current time, add to 
+					#print "found"
+					#new_time = rospy.get_rostime()
+					#print new_time.to_sec()
+					#print self.start_loss_time
+					#self.time_lost += new_time.to_sec() - self.start_loss_time
+					#continue
 
 				if rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) < rospy.Duration(7):
 					self.curve_left(0)
 					self.pub.publish(self.vel_msg)
-					print "1"
+					#print "1"
 
 				if rospy.Duration(7*Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(16 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 					self.straight()
 					self.pub.publish(self.vel_msg)
-					print "2"
+					#print "2"
 
 				if rospy.Duration(16 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(19.75 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 					self.curve_left(0)
 					self.pub.publish(self.vel_msg)
-					print "3"
+					#print "3"
 
 				if rospy.Duration(19.75 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(28.5 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 					self.curve_right(1)
 					self.pub.publish(self.vel_msg)
-					print "4"
+					#print "4"
 
 				if rospy.Duration(28.5 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(41 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 					self.straight()
 					self.pub.publish(self.vel_msg)
-					print "5"
+					#print "5"
 
 				if rospy.Duration(41 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(49 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 					self.curve_right(0)
 					self.pub.publish(self.vel_msg)
-					print "6"
+					#print "6"
 
 				if rospy.Duration(49 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(61 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 					self.straight()
 					self.pub.publish(self.vel_msg)
-					print "7"
+					#print "7"
 
 				if rospy.Duration(61 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(69 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 					self.curve_right(0)
 					self.pub.publish(self.vel_msg)
-					print "8"
+					#print "8"
 
 				if rospy.Duration(69 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(79 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 					self.straight()
 					self.pub.publish(self.vel_msg)
-					print "9"
+					#print "9"
 
 				if rospy.Duration(79 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(89.5 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 					self.curve_left(0)
 					self.pub.publish(self.vel_msg)
-					print "10"
+					#print "10"
 
 				if rospy.Duration(89.5 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(99.5 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 					self.straight()
 					self.pub.publish(self.vel_msg)
-					print "11"
+					#print "11"
 
 				if rospy.Duration(99.5 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(109.25 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 					self.curve_right(0)
 					self.pub.publish(self.vel_msg)
-					print "12"
+					#print "12"
 
 				if rospy.Duration(109.25 * Target.DUR_MUL) <= rospy.get_rostime() - beginning_time - rospy.Duration(self.time_lost) and rospy.get_rostime() - beginning_time < rospy.Duration(122.25 * Target.DUR_MUL) - rospy.Duration(self.time_lost):
 					self.straight()
@@ -288,24 +315,8 @@ class Target:
 					self.pub.publish(self.vel_msg)
 					print "19"
 
-				if self.is_lost==1:
-					current_time = rospy.get_rostime()
-					#current_angle = self.angle
-					#print current_time.to_sec()
-				while self.is_lost==1 and not rospy.is_shutdown():
-					self.vel_msg.angular.z = 0 #Target.ANGVELOCITY*1.5
-					self.vel_msg.linear.x = 0
-					self.pub.publish(self.vel_msg)
-					if self.is_lost==0:
-						new_time = rospy.get_rostime()
-						print new_time.to_sec()
-						self.time_lost += current_time.to_sec() - new_time.to_sec()
-						# print self.time_lost
-						#while self.angle - current_angle > 0.2 or self.angle - current_angle < -0.2:
-							#self.vel_msg.angular.z = Target.ANGVELOCITY*1.5
-							#self.vel_msg.linear.x = 0
-							#self.pub.publish(self.vel_msg)
-						break
+				
+					
 
 			# mode two functions
 			if self.mode==2:
