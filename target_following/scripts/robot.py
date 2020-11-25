@@ -146,7 +146,7 @@ class Robot:
         self.rcvr.robot_pos.y = p[1]
         self.rcvr.robot_ang = self.angle + START_YAW_MAP
 
-        while self.id.blobifying: # dict size may change while this flag is true
+        while self.id.blobifying:  # dict size may change while this flag is true
             continue
 
         # update local map
@@ -297,10 +297,12 @@ class Robot:
         dt = 0.04
         lookahead = 5
         pred = self.pred.predict_hd(dt, lookahead)
-        if pred is not None and pred[1] is not None:
-            last_pred_map = pred[1][-1]
+        if pred is not None and len(pred) > 0:
+            last_pred_map = pred[-1]
             last_pred_base = utils.map_to_base(last_pred_map, self.trans_odom_to_map,
                                                (self.posx, self.posy, self.angle))
+            print "LAST_PRED_MAP: ({}, {})".format(last_pred_map[0], last_pred_map[1])
+            print "LAST_PRED_BAS: ({}, {})".format(last_pred_base[0], last_pred_base[1])
             chase_angle = last_pred_base[1]
             print "predicted angle : ", utils.show(chase_angle)
 
