@@ -149,7 +149,8 @@ class Target:
 			time = rospy.get_rostime()
 			t = time.to_sec()
 			# https://docs.python.org/3/library/math.html
-			self.linxvel = math.sin(0.1*time.to_sec())*0.1 + 0.3 # 0.2 to 0.4 velocity
+			#self.linxvel = math.sin(0.1*time.to_sec())*0.025 + 0.075 # 0.05 to 0.1 velocity
+			self.linxvel = 0.1
 			self.angzvel = math.cos(0.25*time.to_sec())*0.3
 			self.vel_msg.linear.x = self.linxvel 
 			self.vel_msg.angular.z = self.angzvel
@@ -157,7 +158,7 @@ class Target:
 
 	def find_state(self):
 		# giving a state of 1 if the target is too close to an obstacle or if robot lost target
-		if self.distance_front < 0.4 or self.is_lost==1:
+		if self.distance_front < 1 or self.is_lost==1:
 			self.state=1
 		else:
 			self.state=0
