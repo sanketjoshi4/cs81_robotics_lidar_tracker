@@ -22,7 +22,7 @@ try:
             export_name = file_name[:-4] + ".png"
             plt.savefig(export_name)
             plt.title('Target dist cs time')
-            print 'Exported graph ({})'.format(export_name)
+            print 'Exported dist graph ({})'.format(export_name)
     except:
         print "File not found ({})".format(file_name)
 except:
