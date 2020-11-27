@@ -22,26 +22,23 @@ from sensor_msgs.msg import LaserScan
 PI = np.pi
 SIMULATION_TIME = 100
 
-CMD_FREQ = 10  # Hz
-SLEEP = 2  # secs
-VEL = 0.2  # m/s
-
-# TODO : Figure out a better way to code robot's start pose .. env vars?
-START_X_MAP = 3.0  # Would change as per the map
-START_Y_MAP = 5.0  # Would change as per the map
-START_YAW_MAP = 0
-
-
-# START_Z_MAP = 0.0
 
 class Robot:
+    CMD_FREQ = 10  # Hz
+    SLEEP = 2  # secs
+    VEL = 0.2  # m/s
+
+    START_X_MAP = 3.0  # Would change as per the map
+    START_Y_MAP = 5.0  # Would change as per the map
+    START_YAW_MAP = 0  # Would change as per the map
+
     KP = 0.5
 
     def __init__(self):
+        """
+        Initialize all instance vars and publishers/subscribers/listeners for processing & following target
+        """
         rospy.init_node("robot")
-
-        self.map = None
-        self.world = None  # if we do not use world in here, delete this later
 
         # continually updated info about robot's pose wrt odom
         self.posx = None
@@ -52,35 +49,33 @@ class Robot:
         self.last_angle = None
 
         # useful transformation matrices for movement
-        self.mTo = np.array(
-            # corrected!
-            [[1, 0, 0, START_X_MAP], [0, 1, 0, START_Y_MAP], [0, 0, 1, 0], [0, 0, 0, 1]])  # odom to map
-        self.trans_odom_to_map = np.mat(
-            [[1, 0, 0, START_X_MAP],
-             [0, 1, 0, START_Y_MAP],
-             [0, 0, 1, 0],
-             [0, 0, 0, 1]]
-        )
-        self.bTo = None  # odom to base_link
+        mTo_array = [[1, 0, 0, Robot.START_X_MAP], [0, 1, 0, Robot.START_Y_MAP], [0, 0, 1, 0], [0, 0, 0, 1]] # odom to map
+        self.mTo = np.array(mTo_array)
+        self.trans_odom_to_map = np.mat(mTo_array)
+        self.bTo = None  # odom to base_link; updated in call back
 
         self.rcvr_poses = []  # all poses to move to in order to get to last detected target pose
-        self.rcvr = None
+        self.rcvr = None # initialize in move() to avoid null problems
         self.id = Identifier()
         self.pred = Predictor()
+
         self.time_last_scan = None
         self.target_ever_found = False
 
         self.pub = rospy.Publisher("robot_0/cmd_vel", Twist, queue_size=0)
-        self.stat_pub = rospy.Publisher("visible_status", Bool, queue_size=0)  # latest one only
-        self.world_sub = rospy.Subscriber("map", OccupancyGrid, self.map_callback, queue_size=1)
+        self.stat_pub = rospy.Publisher("visible_status", Bool, queue_size=0) # latest one only
         self.odom_sub = rospy.Subscriber("robot_0/odom", Odometry, self.odom_callback)
         self.sub_laser = rospy.Subscriber("robot_0/base_scan", LaserScan, self.laser_scan_callback, queue_size=1)
         self.lis = tf.TransformListener()
 
         self.metrics = Metrics()
-        rospy.sleep(SLEEP)
+
+        rospy.sleep(Robot.SLEEP)
 
     def odom_callback(self, msg):
+        """
+        Update instance variables with latest odom info
+        """
         # getting all of the odom information on the current pose of the robot
         self.posx = msg.pose.pose.position.x
         self.posy = msg.pose.pose.position.y
@@ -90,14 +85,19 @@ class Robot:
              msg.pose.pose.orientation.w])
         self.angle = yaw
 
-    # TEST CODE for visible_status pub
-
     def pub_visibility(self, visible):
+        """
+        Helper function for publishing whether target is visible to robot
+        @param visible: boolean indicates whether target is visible
+        """
         msg = Bool()
         msg.data = visible  # expect boolean
         self.stat_pub.publish(msg)
 
     def get_transform(self):
+        """
+        Callback function to get the latest odom to base_link transformation; CALL BEFORE USING self.bTo
+        """
         # get transformation from odom to base_link
         (trans, rot) = self.lis.lookupTransform('robot_0/base_link', 'robot_0/odom', rospy.Time(0))
         # get everything in regular matrix form
@@ -105,16 +105,10 @@ class Robot:
         r = tf.transformations.quaternion_matrix(rot)
         self.bTo = t.dot(r)
 
-    def map_callback(self, msg):
-        if self.map is None:
-            print("loading map")
-            self.map = World(msg.data, msg.info.width, msg.info.height, msg.info.resolution, msg.header.frame_id,
-                             msg.info.origin)
-            print(self.map.T)
-
     def laser_scan_callback(self, laser_scan_msg):
-        """ Uses laser scan to update target position """
-
+        """
+        Uses laser scan to update target position
+        """
         curr_time = rospy.get_time()
         if self.time_last_scan is None or (curr_time - self.time_last_scan > 1 / Identifier.SCAN_FREQ):
 
@@ -138,19 +132,22 @@ class Robot:
             self.time_last_scan = curr_time
 
     def update_rcvr(self):
+        """
+        Helper function to update Recovery object with necessary info before calling A* search
+        """
         # update recovery with robot's current pose
         self.get_transform()  # update self.bTo first
         p = self.mTo.dot(np.transpose(np.array([self.posx, self.posy, 0, 1])))
         self.rcvr.robot_pos = Point()
         self.rcvr.robot_pos.x = p[0]
         self.rcvr.robot_pos.y = p[1]
-        self.rcvr.robot_ang = self.angle + START_YAW_MAP
+        self.rcvr.robot_ang = self.angle + Robot.START_YAW_MAP
 
         while self.id.blobifying:  # dict size may change while this flag is true
             continue
 
         # update local map
-        blobs_cp = copy.deepcopy(self.id.blobs)
+        blobs_cp = copy.deepcopy(self.id.blobs) # avoid dict size changing while looping below
         blobs = {}  # blob_id:blob_objects
         self.get_transform()  # update again
         for blob_id in blobs_cp:
@@ -178,14 +175,18 @@ class Robot:
             print "Target Lost"
 
     def move(self):
-        self.rcvr = Recovery(self.map)
+        """
+        Calls other functions to determine the velocities to publish
+        """
+        self.rcvr = Recovery()
 
-        rate = rospy.Rate(CMD_FREQ)
+        rate = rospy.Rate(Robot.CMD_FREQ)
         vel_msg = Twist()
         print "Searching for target..."
 
         start_time = rospy.get_time()
 
+        # only run for certain time
         while not rospy.is_shutdown() and rospy.get_time() - start_time < SIMULATION_TIME:
 
             lin_x = 0
@@ -222,8 +223,6 @@ class Robot:
 
             # elif self.rcvr is not None:  # target is out of sight, go into recovery mode
             else:  # target is out of sight, go into recovery mode
-                # continue
-
                 print "In Recovery : ", (
                     ", ".join(["({},{})".format(utils.show(p[0]), utils.show(p[1])) for p in self.rcvr_poses]))
                 self.pub_visibility(False)  # cant see the target
@@ -261,13 +260,13 @@ class Robot:
                             self.rcvr_poses.pop()
                             continue  # no need to waste a publication
                         else:
-                            lin_x = VEL  # rotation ensures we always move forward
+                            lin_x = Robot.VEL  # rotation ensures we always move forward
                     else:
                         lin_x = 0
                         if ang < 0:
-                            ang_z = -VEL
+                            ang_z = -Robot.VEL
                         else:  # can only be positive, near 0 is rounded to 0 and handled above
-                            ang_z = VEL
+                            ang_z = Robot.VEL
 
             vel_msg.linear.x = lin_x
             # vel_msg.linear.x = 0
@@ -283,7 +282,7 @@ class Robot:
     def chase(self):
 
         # TODO: Remove unused variables once done and tested
-        lin_x = VEL
+        lin_x = Robot.VEL
         ang_z = 0.0
         target_angle_base = math.atan2(self.id.target[1], self.id.target[0])
         obs_intervals = self.id.obs_intervals
@@ -383,7 +382,6 @@ class Robot:
 
 
 if __name__ == "__main__":
-    # we'll probably set up target like this from main.py?
     r = Robot()
     r.move()
     r.metrics.generate()
