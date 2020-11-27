@@ -75,6 +75,7 @@ class Robot:
     def odom_callback(self, msg):
         """
         Update instance variables with latest odom info
+        @param msg: odom topic message
         """
         # getting all of the odom information on the current pose of the robot
         self.posx = msg.pose.pose.position.x
@@ -108,6 +109,7 @@ class Robot:
     def laser_scan_callback(self, laser_scan_msg):
         """
         Uses laser scan to update target position
+        @param laser_scan_msg: laser scan message with obstacle info
         """
         curr_time = rospy.get_time()
         if self.time_last_scan is None or (curr_time - self.time_last_scan > 1 / Identifier.SCAN_FREQ):

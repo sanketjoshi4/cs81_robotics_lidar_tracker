@@ -38,7 +38,8 @@ class Recovery:
 
     def create_local_world(self, blobs):
         """
-        Construct local world from blobs dict of {blob_id:Blob()}; must call before calling recover()
+        Construct local world from blobs; must call before calling recover()
+        @param blobs: dict of {blob_id:Blob()}
         """
         # map metadata
         world_w = int(Recovery.LIDAR_RADIUS * 2 / Recovery.RESO) + 1 # account for center position where robot is
@@ -141,6 +142,8 @@ class Recovery:
     def get_nearest_free(self, x, y):
         """
         Returns the nearest cell index x,y that's not within SEARCH_RANGE of an obstacle
+        @param x: x index
+        @param y: y index
         """
         for ny in range(max(0, y - Recovery.SEARCH_RANGE * 2), min(self.world.height, y + Recovery.SEARCH_RANGE * 2 + 1)):
             for nx in range(max(0, x - Recovery.SEARCH_RANGE * 2), min(self.world.width, x + Recovery.SEARCH_RANGE * 2 + 1)):
@@ -153,7 +156,8 @@ class Recovery:
     def diagonal(self, curr_x, curr_y):
         """
         Returns diagonal distance from curr_x,curr_y to self.end[0],self.end[1]--BOTH IN CELL COORDS
-        params curr_x, curr_y: the current x,y cell coordinate whose diagonal distance to end we want
+        @param curr_x: current x cell index whose diagonal distance to end we want
+        @param curr_y: current y cell index
         """
         dx = abs(self.end[0] - curr_x)
         dy = abs(self.end[1] - curr_y)
@@ -224,6 +228,11 @@ class Recovery:
     def get_rotate_yaw(self, x1, y1, yaw1, x2, y2):
         """
         Get the amount to rotate to cell index (x2,y2) given robot is at index (x1,y1) with yaw1
+        @param x1: curr cell x index
+        @param y1: curr cell y index
+        @param yaw1: yaw in curr cell
+        @param x2: next cell x index
+        @param y2: next cell y index
         """
         if x2 == x1:
             # next cell below
@@ -259,6 +268,8 @@ class Recovery:
     def is_near_obs(self, x, y):
         """
         Check if cell index at x,y is near a rock, to take into account of robot size in map
+        @param x: curr cell x index
+        @param y: curr cell y index
         """
         # checks within 5 grid squares around curr cell
         for ny in range(max(0, y - Recovery.SEARCH_RANGE), min(self.world.height, y + Recovery.SEARCH_RANGE + 1)):
@@ -272,7 +283,7 @@ class Recovery:
         """
         Get poses in map as list of [x, y, yaw] from list of cell coordinates/indexes
         Assumes movement up, down, left, right only
-        param path: list of cell indexes in format [x, y]
+        @param path: list of cell indexes in format [x, y]
         """
         # returns 2D list where items are [x, y, yaw] in map frame
         poses = []
