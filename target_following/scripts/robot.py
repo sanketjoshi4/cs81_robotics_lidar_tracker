@@ -50,8 +50,8 @@ class Robot:
 
         # useful transformation matrices for movement
         mTo_array = [[1, 0, 0, Robot.START_X_MAP], [0, 1, 0, Robot.START_Y_MAP], [0, 0, 1, 0], [0, 0, 0, 1]] # odom to map
-        self.mTo = np.array(mTo_array)
-        self.trans_odom_to_map = np.mat(mTo_array)
+        self.mTo = np.array(mTo_array) # recovery uses this object type
+        self.trans_odom_to_map = np.mat(mTo_array) # identifier uses this object type
         self.bTo = None  # odom to base_link; updated in call back
 
         self.rcvr_poses = []  # all poses to move to in order to get to last detected target pose

@@ -8,8 +8,6 @@ import math
 import tf
 
 
-
-
 class Recovery:
     EDGE_WEIGHT = 1 # constant edge weight because everything is 1 grid square away from us, may change this
     SEARCH_RANGE = 5 # grid squares
