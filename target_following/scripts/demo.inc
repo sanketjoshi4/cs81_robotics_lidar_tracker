@@ -41,7 +41,7 @@ define rosbot2 position
   drive "diff"
   color "gray"
 
-  #lidar(pose [ 0.0 0.0 -0.1 0.0 ])
+  lidar(pose [ 0.0 0.0 -0.1 0.0 ])
 )
 
 define obs_rosbot position
