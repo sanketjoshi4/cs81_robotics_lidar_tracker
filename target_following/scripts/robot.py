@@ -8,14 +8,13 @@ import utils
 from recovery import Recovery
 from identifier import Identifier, Blob
 from predictor import Predictor
-from world import World
 from metrics import Metrics
 
 import rospy
 import tf
 
 from geometry_msgs.msg import Twist, Point
-from nav_msgs.msg import OccupancyGrid, Odometry
+from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool
 from sensor_msgs.msg import LaserScan
 

@@ -2,7 +2,6 @@
 import rospy
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Bool
-from world import World
 from nav_msgs.msg import Odometry
 import tf
 from predictor import Predictor
