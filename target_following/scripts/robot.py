@@ -27,6 +27,9 @@ class Robot:
     This is responsible for the overall behaviour of the robot and integration with different components
     """
 
+    DEBUG_CHASE = True
+    DEBUG_RECOVERY = True
+
     CMD_FREQ = 10  # Hz
     SLEEP = 2  # secs
     VEL = 0.2  # m/s
@@ -41,6 +44,7 @@ class Robot:
         """
         Initialize all instance vars and publishers/subscribers/listeners for processing & following target
         """
+
         rospy.init_node("robot")
 
         # continually updated info about robot's pose wrt odom
@@ -245,8 +249,10 @@ class Robot:
 
             # elif self.rcvr is not None:  # target is out of sight, go into recovery mode
             else:  # target is out of sight, go into recovery mode
-                print "In Recovery : ", (
-                    ", ".join(["({},{})".format(utils.show(p[0]), utils.show(p[1])) for p in self.rcvr_poses]))
+
+                if Robot.DEBUG_RECOVERY:
+                    print "In Recovery : ", (
+                        ", ".join(["({},{})".format(utils.show(p[0]), utils.show(p[1])) for p in self.rcvr_poses]))
                 self.pub_visibility(False)  # cant see the target
                 self.metrics.feed(rospy.get_time())
 
@@ -260,8 +266,9 @@ class Robot:
                 # separate if statement so we don't have to wait until next loop iteration
                 # to start moving once entered recovery mode
                 if self.rcvr_poses:
-                    print "goal in map frame: ({},{})".format(utils.show(self.rcvr_poses[0][0]),
-                                                              utils.show(self.rcvr_poses[0][1]))
+                    if Robot.DEBUG_RECOVERY:
+                        print "goal in map frame: ({},{})".format(utils.show(self.rcvr_poses[0][0]),
+                                                                  utils.show(self.rcvr_poses[0][1]))
                     # essentially we are moving to every position from a list that goes
                     # [[goalx, goaly], ..., [startx, starty]], if we encounter target before we finish this list
                     # i.e. state changes back to REGULAR, just clear list to prep for next recovery call
@@ -318,7 +325,8 @@ class Robot:
 
         # init chase angle
         chase_angle = target_angle_base
-        print "target angle    : ", utils.show(chase_angle)
+        if Robot.DEBUG_CHASE:
+            print "target angle    : ", utils.show(chase_angle)
 
         # Incorporate predicted robot position into chase angle
         dt = 0.04
@@ -328,10 +336,13 @@ class Robot:
             last_pred_map = pred[-1]
             last_pred_base = utils.map_to_base(last_pred_map, self.trans_odom_to_map,
                                                (self.posx, self.posy, self.angle))
-            print "LAST_PRED_MAP   : ({}, {})".format(last_pred_map[0], last_pred_map[1])
-            print "LAST_PRED_BAS   : ({}, {})".format(last_pred_base[0], last_pred_base[1])
+            if Robot.DEBUG_CHASE:
+                print "LAST_PRED_MAP   : ({}, {})".format(last_pred_map[0], last_pred_map[1])
+            if Robot.DEBUG_CHASE:
+                print "LAST_PRED_BAS   : ({}, {})".format(last_pred_base[0], last_pred_base[1])
             chase_angle = last_pred_base[1]
-            print "Predicted angle : ", utils.show(chase_angle)
+            if Robot.DEBUG_CHASE:
+                print "Predicted angle : ", utils.show(chase_angle)
 
         # Incorporate obstacles into chase angle
         robot_width_angle = 0.1
@@ -346,22 +357,27 @@ class Robot:
                 # print "target is the obstacle"
                 pass
             else:
-                print "obs             @ <{}|{}>".format(utils.show(min_ang_obs), utils.show(max_ang_obs))
+                if Robot.DEBUG_CHASE:
+                    print "obs             @ <{}|{}>".format(utils.show(min_ang_obs), utils.show(max_ang_obs))
                 go_min_side = math.fabs(chase_angle - min_ang_obs) < math.fabs(chase_angle - max_ang_obs)
                 tangent_angle = min_ang_obs if go_min_side else max_ang_obs
-                print "tangent angle   : {}".format(utils.show(tangent_angle))
+                if Robot.DEBUG_CHASE:
+                    print "tangent angle   : {}".format(utils.show(tangent_angle))
 
                 # Add wiggle room
                 wiggle_angle = 0.1 * (-1 if go_min_side else 1)
-                print "wiggle angle    : {}".format(utils.show(wiggle_angle))
+                if Robot.DEBUG_CHASE:
+                    print "wiggle angle    : {}".format(utils.show(wiggle_angle))
                 chase_angle = tangent_angle + wiggle_angle
-                print "final angle     : ", utils.show(chase_angle)
+                if Robot.DEBUG_CHASE:
+                    print "final angle     : ", utils.show(chase_angle)
 
         if self.id.target is not None:
             ang_z = chase_angle * Robot.KP if self.id.target is not None else 0
 
         dist = math.sqrt(self.id.target[0] * self.id.target[0] + self.id.target[1] * self.id.target[1])
-        print "dist            : ", utils.show(dist)
+        if Robot.DEBUG_CHASE:
+            print "dist            : ", utils.show(dist)
         if dist < 0.5:
             lin_x = 0
 
