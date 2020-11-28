@@ -1,21 +1,12 @@
 #!/usr/bin/env python
 import rospy
 from geometry_msgs.msg import Twist
-from nav_msgs.msg import Odometry
-import numpy as np
-import tf
 import math
 
 # OBSTACLE.PY
 # class for the obstacle objects 
 
 class Obstacle:
-
-	FREQ = 10  # Hz
-	SLEEP = 2
-	PI = np.pi
-	LINVELOCITY = 0.2
-	ANGVELOCITY = 0.2
 
 	def __init__(self):
 		rospy.init_node("obstacles")
@@ -32,6 +23,10 @@ class Obstacle:
 		self.vel_msg4 = Twist()
 
 	def move(self):
+		"""
+		Moving each of the obstacles sinusoidally based on time
+		@params: None
+		"""
 		# moving each of the obstacles
 		time = rospy.get_rostime()
 		self.vel_msg1.linear.x = math.sin(time.to_sec())
