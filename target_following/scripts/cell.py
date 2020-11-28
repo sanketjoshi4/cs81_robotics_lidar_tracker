@@ -5,6 +5,7 @@ class Cell:
     def __init__(self, coords):
         """
         Stores only [x,y] coords/indexes in grid
+        @param coords: list of form [x,y] indicating cell index
         """
         self.coords = coords # expect [x,y] list
 
@@ -17,12 +18,14 @@ class Cell:
     def __eq__(self, other):
         """
         To make checks like 'if c in dict' and 'if c == c1' work
+        @param other: another Cell object to compare to
         """
         return self.coords[0] == other.coords[0] and self.coords[1] == other.coords[1]
 
     def __ne__(self, other):
         """
         To make checks like 'if c in dict' and 'if c == c1' work
+        @param other: another Cell object to compare to
         """
         return self.coords[0] != other.coords[0] or self.coords[1] != other.coords[1]
 
