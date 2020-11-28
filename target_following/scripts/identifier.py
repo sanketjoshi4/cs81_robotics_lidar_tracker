@@ -8,6 +8,8 @@ class Identifier:
     Responsible for using laser scan data to identify obstacles and moving entities
     """
 
+    DEBUG_MODE = True  # To enable debugging with print statements
+
     SCAN_FREQ = 1  # Hz
     ID_INIT_TIME = 3.0  # seconds before ID first detects the target
     LASER_RANGE = 2.0
@@ -102,9 +104,10 @@ class Identifier:
             blob.calculate_mean_and_size(incr)
 
         obs_flag_arr = [i < Identifier.LASER_RANGE for i in arr]
-        self.obs_intervals = self.get_obstacle_intervals(obs_flag_arr, amin, incr)
+        self.obs_intervals = Identifier.get_obstacle_intervals(obs_flag_arr, amin, incr)
 
-        print ", ".join([b.show(robot) for _, b in self.blobs.items()])
+        if Identifier.DEBUG_MODE:
+            print ", ".join([b.show(robot) for _, b in self.blobs.items()])
 
         self.blobifying = False
 
@@ -134,7 +137,6 @@ class Identifier:
                 dx = last_mean_now[0][0] - blob.mean[0]
                 dy = last_mean_now[1][0] - blob.mean[1]
                 shift = float(np.sqrt(dx * dx + dy * dy))
-                # print blob_id, last_blob_id, shift
 
                 is_static = shift <= Identifier.THRESH_BLOB_STATIC
                 is_moving = Identifier.THRESH_BLOB_STATIC < shift <= Identifier.THRESH_BLOB_MOVEMENT
@@ -152,7 +154,8 @@ class Identifier:
 
                 if too_large:
                     # Too large to be the target
-                    # print "OBS:{},{}".format(blob_id, last_blob_id)
+                    if Identifier.DEBUG_MODE:
+                        print "OBS   : {}, {}".format(blob_id, last_blob_id)
                     obs_ids.add(blob_id)
                     continue
 
@@ -163,13 +166,15 @@ class Identifier:
 
                 if is_moving:
                     # If moved since last position
-                    # print "TARGET:{},{}".format(blob_id, last_blob_id)
+                    if Identifier.DEBUG_MODE:
+                        print "TARGET: {}, {}".format(blob_id, last_blob_id)
                     target = blob
                     continue
 
                 if is_static:
                     # Stable since last position
-                    # print "STATIC:{},{}".format(blob_id, last_blob_id)
+                    if Identifier.DEBUG_MODE:
+                        print "STATIC: {}, {}".format(blob_id, last_blob_id)
                     target = blob
                     pass
 
@@ -275,7 +280,8 @@ class Identifier:
 
         return [self.blobs[blob_id] for blob_id in (self.obj_ids + self.obs_ids)]
 
-    def get_obstacle_intervals(self, obs_flag_arr, amin, incr):
+    @staticmethod
+    def get_obstacle_intervals(obs_flag_arr, amin, incr):
         """
         Returns the minimum and maximum angles for each identified obstacle
         @param obs_flag_arr: Whether an obstacle is present at a particular laser reading
@@ -304,12 +310,12 @@ class Blob:
     Encapsulates a blob identified by the ID
     """
 
-    def __init__(self, id):
+    def __init__(self, blob_id):
         """
         Constructor for a Blob item
         """
 
-        self.id = id
+        self.id = blob_id
         self.arr = None  # [coordinates of incident laser rays in bot frame]
         self.mean = None  # [mean coordinate in bot frame]
         self.size = None  # [mean coordinate in bot frame]
