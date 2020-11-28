@@ -9,7 +9,15 @@ import math
 
 class World:
     def __init__(self, data, width, height, reso, frame, origin):
-        """ Initialize all info needed for transformations btwn grid & map and looking up cells """
+        """
+        Initialize all info needed for transformations btwn grid & map and looking up cells
+        @param data: row-major array or list of obstacle info in map, which is divided into grid cells
+        @param width: world width
+        @param height: world height
+        @param reso: map resolution (for grids)
+        @param frame: relative frame that determines grid map position
+        @param origin: origin of grid map (bot left corner) relative to frame
+        """
         self.data = data
         self.width = width
         self.height = height
@@ -25,29 +33,55 @@ class World:
         print(self.T)
 
     def get_cell(self, x, y):
-        """ Return whether cell at x,y index has obstacle """
+        """
+        Return whether cell at x,y index has obstacle
+        @param x: cell index in horz direction
+        @param y: cell index in vert direction
+        """
         return self.data[x + y * self.width]
 
     def map_to_grid(self, x, y, theta):
-        """ Transform x,y,yaw in map to grid """
+        """
+        Transform x,y,yaw in map to grid
+        @param x: cell index in horz direction
+        @param y: cell index in vert direction
+        @param theta: yaw to convert       
+        """
         grid_pose = np.linalg.inv(self.T).dot(np.transpose(np.array([x, y, 0, 1])))
         grid_theta = theta - self.origin[2]
         return (grid_pose[0], grid_pose[1], grid_theta)
 
     def grid_to_map(self, x, y, theta):
-        """ Transform x,y,yaw in grid to map """
+        """
+        Transform x,y,yaw in grid to map
+        @param x: cell index in horz direction
+        @param y: cell index in vert direction
+        @param theta: yaw to convert       
+        """
         map_pose = self.T.dot(np.transpose(np.array([x, y, 0, 1])))
         map_theta = theta + self.origin[2]
         return (map_pose[0], map_pose[1], map_theta)
 
     def grid_to_cell(self, x, y):
-        """ Transform x,y grid coordinates in meters to cell indexes """
+        """
+        Transform x,y grid coordinates in meters to cell indexes
+        @param x: distance in x-axis
+        @param y: distance in y-axis
+        """
         return (int(math.floor(x / self.reso)), int(math.floor(y / self.reso)))
 
     def cell_to_grid(self, x , y):
-        """ Transform x,y cell indexes to grid coordinates, rounded to be center of cell """
+        """
+        Transform x,y cell indexes to grid coordinates, rounded to be center of cell
+        @param x: cell index in horz direction
+        @param y: cell index in vert direction
+        """
         return ((x * self.reso) + (self.reso / 2), (y * self.reso) + (self.reso / 2))
 
     def on_grid(self, x, y):
-        """ Returns whether x,y cell indexes are on grid """
+        """
+        Returns whether x,y cell indexes are on grid
+        @param x: cell index in horz direction
+        @param y: cell index in vert direction
+        """
         return 0 <= x < self.width and 0 <= y < self.height
