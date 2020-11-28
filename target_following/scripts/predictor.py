@@ -3,7 +3,6 @@ import rospy
 from geometry_msgs.msg import Twist
 import math
 import random
-#from identifier.py import Identifier # importing Identifier
 
 # PREDICTOR.PY 
 # class to predict robot movement
@@ -21,9 +20,12 @@ class Predictor:
 		self.predx_vel = 0
 		self.predy_vel = 0
 
-	# given pose information from Identifier, updating instance variable for Predictors
+	# given pose information, updating instance variable for Predictors
 	def update_targetpos(self, posx, posy, xvel, yvel):
-
+		"""
+		Adding pose information to poses list
+		@params posx, posy, xvel, yvel: taken from Identifier and called in Robot 
+		"""
 		# if the target was not found, clearing the poses list and returning
 		if None in [posx, posy, xvel, yvel]:
 			self.poses = []
@@ -48,39 +50,12 @@ class Predictor:
 		# adding new pose to the poses list
 		self.poses.append(target)
 
-	# given poses, return robot intended linear and angular velocity
-	def predict(self, dt): 
-
-		# if there is nothing in the poses list, simply returning
-		if len(self.poses)<1:
-			return []
-
-		last_obs = self.poses[-1]
-		if len(self.poses) > 1:
-			seclast_obs = self.poses[-2]
-		## https://docs.python.org/3/library/math.html
-		# using kalman filtering model, prediction is the last position + predicted changes in velocity; 80% last obs, 20% obs before that
-			self.predx_vel = 0.8*last_obs.get_xvel() + 0.2*seclast_obs.get_xvel()
-			self.predy_vel =0.8*last_obs.get_yvel() + 0.2*seclast_obs.get_yvel()
-		else: # just usinng last observation
-			self.predx_vel = last_obs.get_xvel()
-			self.predy_vel = last_obs.get_yvel() 
-		predtuple = (self.predx_vel, self.predy_vel)
-		# getting five next poses, each over the span of 5 dts
-		predposes = []		
-		i = 0
-		while i < 5:
-			xnew = last_obs.get_posx() + (i+1)*self.predx_vel*dt
-			ynew = last_obs.get_posy() + (i+1)*self.predy_vel*dt
-			predposes.append( (xnew, ynew) ) 		
-			i += 1
-		# returning the predicted velocities in the tuple and the next five poses
-		return (predtuple, predposes)
-
-
-	# more advanced version of prediiction 
+	# advanced version of prediction 
 	def predict_hd(self, dt, lookahead):
-
+		"""
+		Returns next lookahead predicted poses; Called in Robot
+		@params dt: change in time between poses, lookahead, number of poses wanted
+		"""
 		# skipping if there is nothing in the list and therefore returning empty list of poses for predict
 		if len(self.poses)<1:
 			return []
@@ -162,6 +137,10 @@ class Predictor:
 
 	# function that normalizes velocity
 	def normalize(self, x, y):
+		"""
+		Returns normalized valyes for x and y;
+		@params x, y: velocities 
+		"""
 		if x > 1 or y > 1:
 			newx = x / ( x * x + y * y)
 			newy = y / ( x * x + y * y)
@@ -169,16 +148,6 @@ class Predictor:
 		else: 
 			return (x, y)
 		
-
-	#def main(self):
-		#while not rospy.is_shutdown():
-			#self.update_targetpos(1, 1, 1, 0)
-			#self.predict_hd(0.1, 5)
-			#self.predict_hd(0.1, 5)
-			#self.update_targetpos(0, 0, 1, 1)
-			#self.predict_hd(0.1, 5)
-
-			#break
 
 # mini class that has all the current information on target's whereabouts
 class Pose:
