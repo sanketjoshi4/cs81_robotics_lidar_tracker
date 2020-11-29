@@ -1,13 +1,14 @@
-#!/usr/bin/env python
-
 import copy
 import numpy as np
-
 import utils
 
 
 class Identifier:
-    """ Rsponsible for using laser scan data to identify obstacles and moving entities """
+    """
+    Responsible for using laser scan data to identify obstacles and moving entities
+    """
+
+    DEBUG_MODE = True  # To enable debugging with print statements
 
     SCAN_FREQ = 1  # Hz
     ID_INIT_TIME = 3.0  # seconds before ID first detects the target
@@ -41,7 +42,9 @@ class Identifier:
     DIST_MAX_FAR = 20
 
     def __init__(self):  # All in the robot's frame of reference
-        """ Initializes the instance variables """
+        """
+        Initializes the instance variables
+        """
 
         self.blobs = {}  # dict of blob_id to Blob item
         self.target = None  # (x, y)
@@ -57,13 +60,17 @@ class Identifier:
         self.last_target_vel = None
 
         self.status = None  # Amongst
-        self.blobifying = False # To track when blobify() is running
+        self.blobifying = False  # To track when blobify() is running
 
     def blobify(self, laser_scan_msg, robot):
-        """ This updates the dict of blobs. Each blob is stored against a place holder id """
+        """
+        This updates the dict of blobs. Each blob is stored against a place holder id
+        @param laser_scan_msg: The laser scan callback data
+        @param robot: The robot object for the identifier
+        """
 
-        self.blobifying = True
-        
+        self.blobifying = True  # Whether this function is under execution
+
         amin = laser_scan_msg.angle_min  # Minimum angle of overall scan
         incr = laser_scan_msg.angle_increment  # Angle increment of overall scan
         arr = laser_scan_msg.ranges  # List of readings
@@ -97,14 +104,18 @@ class Identifier:
             blob.calculate_mean_and_size(incr)
 
         obs_flag_arr = [i < Identifier.LASER_RANGE for i in arr]
-        self.obs_intervals = self.get_obstacle_intervals(obs_flag_arr, amin, incr)
+        self.obs_intervals = Identifier.get_obstacle_intervals(obs_flag_arr, amin, incr)
 
-        print ", ".join([b.show(robot) for _, b in self.blobs.items()])
-        
+        if Identifier.DEBUG_MODE:
+            print ", ".join([b.show(robot) for _, b in self.blobs.items()])
+
         self.blobifying = False
 
     def classify(self, movement_transform):
-        """ This is responsible for separating moving blobs from static ones. Saves the blob in motion as the target """
+        """
+        This is responsible for separating moving blobs from static ones. Saves the blob in motion as the target
+        @param movement_transform: The homogeneous transformation matrix between the last and current robot pose
+        """
 
         obs_ids = set()
         obj_ids = set()
@@ -126,7 +137,6 @@ class Identifier:
                 dx = last_mean_now[0][0] - blob.mean[0]
                 dy = last_mean_now[1][0] - blob.mean[1]
                 shift = float(np.sqrt(dx * dx + dy * dy))
-                # print blob_id, last_blob_id, shift
 
                 is_static = shift <= Identifier.THRESH_BLOB_STATIC
                 is_moving = Identifier.THRESH_BLOB_STATIC < shift <= Identifier.THRESH_BLOB_MOVEMENT
@@ -139,20 +149,32 @@ class Identifier:
                     close_to_last_target = np.sqrt(dtx * dtx + dty * dty) < 0.5
 
                 if is_different:
+                    # Too far to be the same blob
                     continue
+
                 if too_large:
-                    # print "OBS:{},{}".format(blob_id, last_blob_id)
+                    # Too large to be the target
+                    if Identifier.DEBUG_MODE:
+                        print "OBS   : {}, {}".format(blob_id, last_blob_id)
                     obs_ids.add(blob_id)
                     continue
+
                 if not close_to_last_target:
+                    # Too far from last target location to be the target
                     obj_ids.add(blob_id)
                     continue
+
                 if is_moving:
-                    # print "TARGET:{},{}".format(blob_id, last_blob_id)
+                    # If moved since last position
+                    if Identifier.DEBUG_MODE:
+                        print "TARGET: {}, {}".format(blob_id, last_blob_id)
                     target = blob
                     continue
+
                 if is_static:
-                    # print "STATIC:{},{}".format(blob_id, last_blob_id)
+                    # Stable since last position
+                    if Identifier.DEBUG_MODE:
+                        print "STATIC: {}, {}".format(blob_id, last_blob_id)
                     target = blob
                     pass
 
@@ -160,7 +182,6 @@ class Identifier:
         self.last_obs = copy.deepcopy(self.obs_ids)
         self.last_target = copy.deepcopy(self.target)  # in base_scan ref
         self.last_known_target = copy.deepcopy(self.target) if self.target is not None else self.last_known_target
-        # self.last_target_vel = copy.deepcopy(self.target_vel)  # in base_scan ref
 
         # Update blobs and target
         self.obs_ids = obs_ids
@@ -168,7 +189,9 @@ class Identifier:
         self.target = target.mean if target is not None else None  # in base_scan ref
 
     def status(self):
-        """ This returns the FSM state given the target location w.r.t. robot """
+        """
+        This returns the FSM state given the target location w.r.t. robot
+        """
 
         if self.target is None:
             return Identifier.STATUS_ERR
@@ -183,6 +206,16 @@ class Identifier:
 
     @staticmethod
     def get_pos(target, robot_x, robot_y, robot_angle, trans_odom_to_map, frame):
+        """
+        Converts a point in base frame to a given frame
+        @param target: The point in question
+        @param robot_x: Robot's odom reading (X)
+        @param robot_y: Robot's odom reading (Y)
+        @param robot_angle: Robot's odom reading (Yaw)
+        @param trans_odom_to_map: Homogeneous transformation matrix form odom to map
+        @param frame: The output frame
+        """
+
         if target is None:
             return None
 
@@ -205,26 +238,34 @@ class Identifier:
         return None
 
     def get_target_pos_vel(self, robot, frame):
-        """ This returns the target position and velocity if identified, in the specified frame of reference """
+        """
+        This returns the target position and velocity if identified, in the specified frame of reference
+        @robot: The robot's odom pose
+        @frame: The output frame
+        """
 
         if self.target is None:
             return None, None
 
+        # Current target position in frame
         target_pos = Identifier.get_pos(
             target=self.target,
             robot_x=robot.posx, robot_y=robot.posy, robot_angle=robot.angle,
             trans_odom_to_map=robot.trans_odom_to_map, frame=frame
         )
 
+        # Last target position in frame
         last_target_pos = Identifier.get_pos(
             target=self.last_target,
             robot_x=robot.last_posx, robot_y=robot.last_posy, robot_angle=robot.last_angle,
             trans_odom_to_map=robot.trans_odom_to_map, frame=frame
         )
 
+        # Only current pose
         if self.last_target is None:
             return target_pos, None
 
+        # Calculate velocity
         target_vel = (
             (target_pos[0] - last_target_pos[0]) * Identifier.SCAN_FREQ,
             (target_pos[1] - last_target_pos[1]) * Identifier.SCAN_FREQ
@@ -233,9 +274,21 @@ class Identifier:
         return target_pos, target_vel
 
     def get_obstacles(self):
+        """
+        References obstacles from lookup
+        """
+
         return [self.blobs[blob_id] for blob_id in (self.obj_ids + self.obs_ids)]
 
-    def get_obstacle_intervals(self, obs_flag_arr, amin, incr):
+    @staticmethod
+    def get_obstacle_intervals(obs_flag_arr, amin, incr):
+        """
+        Returns the minimum and maximum angles for each identified obstacle
+        @param obs_flag_arr: Whether an obstacle is present at a particular laser reading
+        @param amin: Minimum laser reading angle
+        @param incr: Angle increment between laser readings
+        """
+
         in_obstacle = obs_flag_arr[0] is True
         temp_start = 0
         intervals = []
@@ -253,20 +306,36 @@ class Identifier:
 
 
 class Blob:
-    """ Encapsulated a blob identified by the ID """
+    """
+    Encapsulates a blob identified by the ID
+    """
 
-    def __init__(self, id):
-        self.id = id
+    def __init__(self, blob_id):
+        """
+        Constructor for a Blob item
+        """
+
+        self.id = blob_id
         self.arr = None  # [coordinates of incident laser rays in bot frame]
         self.mean = None  # [mean coordinate in bot frame]
         self.size = None  # [mean coordinate in bot frame]
 
     def add_point(self, point):
+        """
+        Adds a point to a blob
+        @param point: The point to add
+        """
+
         if self.arr is None:
             self.arr = []
         self.arr.append(point)
 
     def calculate_mean_and_size(self, increment):
+        """
+        Calculates the blob mean and apparent size
+        @param increment: The angle increment between readings
+        """
+
         if self.arr is not None:
             self.mean = (
                 sum([p[0] for p in self.arr]) / len(self.arr), sum([p[1] for p in self.arr]) / len(self.arr))
@@ -274,19 +343,29 @@ class Blob:
             self.size = increment * len(self.arr) * dist_mean
 
     def dist(self, blob2):
+        """
+        Distance between two blobs
+        @param blob2: Distance between two blobs
+        """
+
         dx = self.mean[0] - blob2.mean[0]
         dy = self.mean[1] - blob2.mean[1]
         return float(np.sqrt(dx * dx + dy * dy))
 
     def show(self, robot):
+        """
+        Pretty print a blob
+        @param robot: The identifier's robot object
+        """
+
         mean_map = Identifier.get_pos(
             target=self.mean,
             robot_x=robot.posx, robot_y=robot.posy, robot_angle=robot.angle,
             trans_odom_to_map=robot.trans_odom_to_map, frame="MAP"
         )
+
         return "{}:[{}]@({},{})".format(self.id,
                                         utils.show(self.size),
                                         utils.show(mean_map[0], 1),
                                         utils.show(mean_map[1], 1)
-        )
-
+                                        )

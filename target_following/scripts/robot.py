@@ -23,6 +23,13 @@ SIMULATION_TIME = 100
 
 
 class Robot:
+    """
+    This is responsible for the overall behaviour of the robot and integration with different components
+    """
+
+    DEBUG_CHASE = True
+    DEBUG_RECOVERY = True
+
     CMD_FREQ = 10  # Hz
     SLEEP = 2  # secs
     VEL = 0.2  # m/s
@@ -37,6 +44,7 @@ class Robot:
         """
         Initialize all instance vars and publishers/subscribers/listeners for processing & following target
         """
+
         rospy.init_node("robot")
 
         # continually updated info about robot's pose wrt odom
@@ -48,13 +56,18 @@ class Robot:
         self.last_angle = None
 
         # useful transformation matrices for movement
-        mTo_array = [[1, 0, 0, Robot.START_X_MAP], [0, 1, 0, Robot.START_Y_MAP], [0, 0, 1, 0], [0, 0, 0, 1]] # odom to map
-        self.mTo = np.array(mTo_array) # recovery uses this object type
-        self.trans_odom_to_map = np.mat(mTo_array) # identifier uses this object type
+        odom_to_map_array = [
+            [1, 0, 0, Robot.START_X_MAP],
+            [0, 1, 0, Robot.START_Y_MAP],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1]
+        ]  # odom to map
+        self.mTo = np.array(odom_to_map_array)  # recovery uses this object type
+        self.trans_odom_to_map = np.mat(odom_to_map_array)  # identifier uses this object type
         self.bTo = None  # odom to base_link; updated in call back
 
         self.rcvr_poses = []  # all poses to move to in order to get to last detected target pose
-        self.rcvr = None # initialize in move() to avoid null problems
+        self.rcvr = None  # initialize in move() to avoid null problems
         self.id = Identifier()
         self.pred = Predictor()
 
@@ -62,7 +75,7 @@ class Robot:
         self.target_ever_found = False
 
         self.pub = rospy.Publisher("robot_0/cmd_vel", Twist, queue_size=0)
-        self.stat_pub = rospy.Publisher("visible_status", Bool, queue_size=0) # latest one only
+        self.stat_pub = rospy.Publisher("visible_status", Bool, queue_size=0)  # latest one only
         self.odom_sub = rospy.Subscriber("robot_0/odom", Odometry, self.odom_callback)
         self.sub_laser = rospy.Subscriber("robot_0/base_scan", LaserScan, self.laser_scan_callback, queue_size=1)
         self.lis = tf.TransformListener()
@@ -76,6 +89,7 @@ class Robot:
         Update instance variables with latest odom info
         @param msg: odom topic message
         """
+
         # getting all of the odom information on the current pose of the robot
         self.posx = msg.pose.pose.position.x
         self.posy = msg.pose.pose.position.y
@@ -90,6 +104,7 @@ class Robot:
         Helper function for publishing whether target is visible to robot
         @param visible: boolean indicates whether target is visible
         """
+
         msg = Bool()
         msg.data = visible  # expect boolean
         self.stat_pub.publish(msg)
@@ -98,6 +113,7 @@ class Robot:
         """
         Callback function to get the latest odom to base_link transformation; CALL BEFORE USING self.bTo
         """
+
         # get transformation from odom to base_link
         (trans, rot) = self.lis.lookupTransform('robot_0/base_link', 'robot_0/odom', rospy.Time(0))
         # get everything in regular matrix form
@@ -110,6 +126,7 @@ class Robot:
         Uses laser scan to update target position
         @param laser_scan_msg: laser scan message with obstacle info
         """
+
         curr_time = rospy.get_time()
         if self.time_last_scan is None or (curr_time - self.time_last_scan > 1 / Identifier.SCAN_FREQ):
 
@@ -136,6 +153,7 @@ class Robot:
         """
         Helper function to update Recovery object with necessary info before calling A* search
         """
+
         # update recovery with robot's current pose
         self.get_transform()  # update self.bTo first
         p = self.mTo.dot(np.transpose(np.array([self.posx, self.posy, 0, 1])))
@@ -148,7 +166,7 @@ class Robot:
             continue
 
         # update local map
-        blobs_cp = copy.deepcopy(self.id.blobs) # avoid dict size changing while looping below
+        blobs_cp = copy.deepcopy(self.id.blobs)  # avoid dict size changing while looping below
         blobs = {}  # blob_id:blob_objects
         self.get_transform()  # update again
         for blob_id in blobs_cp:
@@ -164,6 +182,12 @@ class Robot:
         self.rcvr.create_local_world(blobs)
 
     def display_target_status(self, tpos, tvel):
+        """
+        Pretty prints target position and velocity in map frame
+        @param tpos: Target position
+        @param tvel: Target velocity
+        """
+
         if not self.target_ever_found:
             return
 
@@ -179,6 +203,7 @@ class Robot:
         """
         Calls other functions to determine the velocities to publish
         """
+
         self.rcvr = Recovery()
 
         rate = rospy.Rate(Robot.CMD_FREQ)
@@ -224,8 +249,10 @@ class Robot:
 
             # elif self.rcvr is not None:  # target is out of sight, go into recovery mode
             else:  # target is out of sight, go into recovery mode
-                print "In Recovery : ", (
-                    ", ".join(["({},{})".format(utils.show(p[0]), utils.show(p[1])) for p in self.rcvr_poses]))
+
+                if Robot.DEBUG_RECOVERY:
+                    print "In Recovery : ", (
+                        ", ".join(["({},{})".format(utils.show(p[0]), utils.show(p[1])) for p in self.rcvr_poses]))
                 self.pub_visibility(False)  # cant see the target
                 self.metrics.feed(rospy.get_time())
 
@@ -236,12 +263,15 @@ class Robot:
                 # print("retrieved rcvr_poses", self.rcvr_poses)
 
                 # in the middle of recovery mode
-                # separate if statement so we don't have to wait until next loop iteration to start moving once entered recovery mode
+                # separate if statement so we don't have to wait until next loop iteration
+                # to start moving once entered recovery mode
                 if self.rcvr_poses:
-                    print "goal in map frame: ({},{})".format(utils.show(self.rcvr_poses[0][0]),
-                                                              utils.show(self.rcvr_poses[0][1]))
-                    # essentially we are moving to every position from a list that goes [[goalx, goaly], ..., [startx, starty]], if we encounter
-                    # target before we finish this list i.e. state changes back to REGULAR, just clear list to prep for next recovery call
+                    if Robot.DEBUG_RECOVERY:
+                        print "goal in map frame: ({},{})".format(utils.show(self.rcvr_poses[0][0]),
+                                                                  utils.show(self.rcvr_poses[0][1]))
+                    # essentially we are moving to every position from a list that goes
+                    # [[goalx, goaly], ..., [startx, starty]], if we encounter target before we finish this list
+                    # i.e. state changes back to REGULAR, just clear list to prep for next recovery call
                     pose = self.rcvr_poses[-1]
 
                     # transform user-given point in odom to base_link, assume ROBOT CAN'T FLY
@@ -249,11 +279,14 @@ class Robot:
                     v = np.linalg.inv(self.mTo).dot(np.transpose(np.array([pose[0], pose[1], 0, 1])))
                     v = self.bTo.dot(v)
                     v = v[0:2]  # only need x,y because of assumption above
+
                     # remaining angle to turn i.e. angle btwn x-axis vector and vector of x,y above
                     ang = np.arctan2(v[1], v[0])
                     if -0.05 <= ang <= 0.05:
+
                         # turn finished so start moving in lin x only, if applicable
                         ang_z = 0
+
                         # remaining euclidean distance to travel, assume no movement in z-axis
                         dis = np.linalg.norm(np.array([0, 0]) - v)
                         if -0.05 <= dis <= 0.05:
@@ -262,6 +295,7 @@ class Robot:
                             continue  # no need to waste a publication
                         else:
                             lin_x = Robot.VEL  # rotation ensures we always move forward
+
                     else:
                         lin_x = 0
                         if ang < 0:
@@ -270,19 +304,20 @@ class Robot:
                             ang_z = Robot.VEL
 
             vel_msg.linear.x = lin_x
-            # vel_msg.linear.x = 0
             vel_msg.angular.z = ang_z
-            # vel_msg.angular.z = 0
             self.pub.publish(vel_msg)
             rate.sleep()
 
+        # Halt the target once simulation is elapsed
         vel_msg.linear.x = 0
         vel_msg.angular.z = 0
         self.pub.publish(vel_msg)
 
     def chase(self):
+        """
+        This guides the robot when the target is visible
+        """
 
-        # TODO: Remove unused variables once done and tested
         lin_x = Robot.VEL
         ang_z = 0.0
         target_angle_base = math.atan2(self.id.target[1], self.id.target[0])
@@ -290,9 +325,9 @@ class Robot:
 
         # init chase angle
         chase_angle = target_angle_base
-        print "target angle    : ", utils.show(chase_angle)
+        if Robot.DEBUG_CHASE:
+            print "target angle    : ", utils.show(chase_angle)
 
-        # TODO: Adjust dt and lookahead, find better way to define
         # Incorporate predicted robot position into chase angle
         dt = 0.04
         lookahead = 5
@@ -301,10 +336,13 @@ class Robot:
             last_pred_map = pred[-1]
             last_pred_base = utils.map_to_base(last_pred_map, self.trans_odom_to_map,
                                                (self.posx, self.posy, self.angle))
-            print "LAST_PRED_MAP: ({}, {})".format(last_pred_map[0], last_pred_map[1])
-            print "LAST_PRED_BAS: ({}, {})".format(last_pred_base[0], last_pred_base[1])
+            if Robot.DEBUG_CHASE:
+                print "LAST_PRED_MAP   : ({}, {})".format(last_pred_map[0], last_pred_map[1])
+            if Robot.DEBUG_CHASE:
+                print "LAST_PRED_BAS   : ({}, {})".format(last_pred_base[0], last_pred_base[1])
             chase_angle = last_pred_base[1]
-            print "predicted angle : ", utils.show(chase_angle)
+            if Robot.DEBUG_CHASE:
+                print "Predicted angle : ", utils.show(chase_angle)
 
         # Incorporate obstacles into chase angle
         robot_width_angle = 0.1
@@ -319,26 +357,27 @@ class Robot:
                 # print "target is the obstacle"
                 pass
             else:
-                print "obs             @ <{}|{}>".format(utils.show(min_ang_obs), utils.show(max_ang_obs))
+                if Robot.DEBUG_CHASE:
+                    print "obs             @ <{}|{}>".format(utils.show(min_ang_obs), utils.show(max_ang_obs))
                 go_min_side = math.fabs(chase_angle - min_ang_obs) < math.fabs(chase_angle - max_ang_obs)
                 tangent_angle = min_ang_obs if go_min_side else max_ang_obs
-                print "tangent angle   : {}".format(utils.show(tangent_angle))
+                if Robot.DEBUG_CHASE:
+                    print "tangent angle   : {}".format(utils.show(tangent_angle))
 
                 # Add wiggle room
-                # TODO: Does the wiggle function provide substantial benefit over constant wiggle? Is it needed?
                 wiggle_angle = 0.1 * (-1 if go_min_side else 1)
-                # wiggle_angle = self.get_wiggle((rvx, rvy), (tvx, tvy))
-                print "wiggle angle    : {}".format(utils.show(wiggle_angle))
-                # wiggle_angle = 0
+                if Robot.DEBUG_CHASE:
+                    print "wiggle angle    : {}".format(utils.show(wiggle_angle))
                 chase_angle = tangent_angle + wiggle_angle
-                print "final angle     : ", utils.show(chase_angle)
+                if Robot.DEBUG_CHASE:
+                    print "final angle     : ", utils.show(chase_angle)
 
         if self.id.target is not None:
             ang_z = chase_angle * Robot.KP if self.id.target is not None else 0
 
         dist = math.sqrt(self.id.target[0] * self.id.target[0] + self.id.target[1] * self.id.target[1])
-        print "dist            : ", utils.show(dist)
-        # TODO: Get linvel from a pid function to avoid collision with target
+        if Robot.DEBUG_CHASE:
+            print "dist            : ", utils.show(dist)
         if dist < 0.5:
             lin_x = 0
 
@@ -346,30 +385,10 @@ class Robot:
 
         return lin_x, ang_z
 
-    def get_wiggle(self, rv, tv):
-        """
-            get_wiggle :: -> (rv, tv) angle
-            wiggle_angle <- angle_btwn(rv,tv)
-            return wiggle angle
-        """
-        # getting individual components, assuming rv and tv are tuples (rv is robot velocity, tv is target velocity)
-        xrv = rv[0]
-        yrv = rv[1]
-        xtv = tv[0]
-        ytv = tv[1]
-        # taking dot product
-        dot = np.dot([xrv, yrv], [xtv, ytv])
-
-        # getting lengths of both vectors
-        lenrv = math.pow(xrv * xrv + yrv * yrv, 0.5)
-        lentv = math.pow(xtv * xtv + ytv * ytv, 0.5)
-        # getting angle between
-        angle = math.acos(dot / (lenrv * lentv))
-
-        # returning the angle between the two vector
-        return angle
-
     def get_movement_transform(self):
+        """
+        This returns the homogeneous transformation matrix between current and last robot pose
+        """
 
         sz1 = np.sin(self.angle)
         cz1 = np.cos(self.angle)
