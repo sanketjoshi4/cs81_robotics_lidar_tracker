@@ -3,7 +3,7 @@
 ### Archita Harathi, Sanket Joshi, Jospehine Nguyen 
 ### CS 81, Fall 2020 
 
-Using LIDAR to detect, track, and pursue a moving entity in a world with other moving entities and obstacles
+Using LIDAR to detect, track, and pursue a moving entity in a world with other moving entities and obstacles.
 
 ## Instructions
 Paste the package (i.e. target_following directory) in a valid catkin workspace.
@@ -19,8 +19,6 @@ Run in different windows:
 1. `roscore`
 
 2. `rosrun stage_ros stageros demo.world`
-
-3. `rosrun map_server map_server demo.yaml` 
 
 4. `rosrun target_following target.py`
 
