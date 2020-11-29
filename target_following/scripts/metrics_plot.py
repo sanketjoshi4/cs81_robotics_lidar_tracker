@@ -4,26 +4,41 @@ import csv
 import sys
 import matplotlib.pyplot as plt
 
-try:
-    file_name = sys.argv[1]
+
+def generate_graph():
+    """
+    This reads a csv metrics file and generates graph for the same
+    The file path needs to be supplied as the first argument while running this code
+    The first column of the csv is the seconds passed since start time and second is target distance in meters
+    """
+
     try:
-        with open(file_name) as csv_file:
-            output = [row for row in csv.reader(csv_file, delimiter=',')][1:]
-            csv_file.close()
+        file_name = sys.argv[1]
+        try:
+            # Read csv
+            with open(file_name) as csv_file:
+                output = [row for row in csv.reader(csv_file, delimiter=',')][1:]
+                csv_file.close()
 
-            x1 = [d[0] for d in output]
-            y1 = [d[1] for d in output]
-            plt.plot(x1, y1, label="Dist")
-            plt.xlabel('time (sec)')
-            plt.ylabel('dist (m)')
-            plt.title('Target distance vs time')
-            plt.legend()
+                # Prepare matplotlib graph
+                x1 = [d[0] for d in output]
+                y1 = [d[1] for d in output]
+                plt.plot(x1, y1, label="Dist")
+                plt.xlabel('time (sec)')
+                plt.ylabel('dist (m)')
+                plt.title('Target distance vs time')
+                plt.legend()
 
-            export_name = file_name[:-4] + ".png"
-            plt.savefig(export_name)
-            plt.title('Target dist cs time')
-            print 'Exported dist graph ({})'.format(export_name)
+                # Export graph
+                export_name = file_name[:-4] + ".png"
+                plt.savefig(export_name)
+                plt.title('Target dist cs time')
+                print 'Exported dist graph ({})'.format(export_name)
+        except:
+            print "File not found ({})".format(file_name)
     except:
-        print "File not found ({})".format(file_name)
-except:
-    print "Missing file name argument"
+        print "Missing file name argument"
+
+
+if __name__ == "__main__":
+    generate_graph()

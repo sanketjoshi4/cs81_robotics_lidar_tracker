@@ -1,18 +1,34 @@
-#!/usr/bin/env python
 
 import csv
 import time
 
 
 class Metrics:
+    """
+    Responsible for generating target distance metrics
+    """
 
     def __init__(self):
+        """
+        Constructor
+        """
+
         self.dists = []  # A list of tuple (timestamp, dist from target)
 
     def feed(self, timestamp, dist=None):
+        """
+        This records data for a particular tick for metric generation
+        @param timestamp: The current timestamp
+        @param dist: Distance to target
+        """
+
         self.dists.append([timestamp, 0 if dist is None else dist])
 
     def generate(self, tag=None):
+        """
+        This generates a csv file with collected metrics data
+        @param tag: A unique identifier
+        """
 
         print "Simulation ended, exporting metrics..."
         tag = tag if tag is not None else time.strftime("%Y-%m-%d_%H-%M-%S")
