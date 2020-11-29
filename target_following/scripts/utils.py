@@ -1,10 +1,13 @@
-#!/usr/bin/env python
 
 import numpy as np
 
 
 def show_pos(np_pos):
-    """ A printable version of 1d numpy array for pose """
+    """
+    A printable version of 1d numpy array for pose
+    @param np_pos: Numpy array of position [x,y,_,_]
+    """
+
     return show(float(np_pos[0][0])), show(float(np_pos[1][0]))
 
 
@@ -15,7 +18,11 @@ def show(x, n=2):
         show (23.1238, n=3)     = " 023.124"       # Rounded an padded
         show (-1.2, n=3)        = "-001.200"       # Aligns negative numbers with positive
         show (1111.0, n=3)      = " 111.000"       # Capped to 3 on both sides of decimal
+
+    @param x: Input
+    @param n: Precision
     """
+
     if x is None:
         return ""
 
@@ -31,6 +38,12 @@ def show(x, n=2):
 
 
 def map_to_base(pos_from, odom_to_map=None, robot_pose_odom=None):
+    """
+    Converts point from map frame to base frame
+    @param pos_from: Input point
+    @param odom_to_map: Odometer to map homogeneous matrix transformation
+    @param robot_pose_odom: Robot's odometrical pose
+    """
 
     if pos_from is None:
         return None
@@ -53,8 +66,16 @@ def map_to_base(pos_from, odom_to_map=None, robot_pose_odom=None):
     np_pos_to = odom_to_base.dot(odom_to_map.getI()).dot(np_pos_from)
     return float(np_pos_to[0][0]), float(np_pos_to[1][0])
 
+
 def transform(frame_from, frame_to, pos_from, odom_to_map=None, robot_pose_odom=None):
-    # MAP <-> ODOM <-> BASE
+    """
+    Converts point between frames
+    @param frame_from: Input frame
+    @param frame_to: Output frame
+    @param pos_from: Input position
+    @param odom_to_map: Odometer to map homogeneous matrix transformation
+    @param robot_pose_odom: Robot's odometrical pose
+    """
 
     if frame_from == frame_to:
         return pos_from
@@ -99,4 +120,3 @@ def transform(frame_from, frame_to, pos_from, odom_to_map=None, robot_pose_odom=
     np_pos_to = trans_mat.dot(np_pos_from)
 
     return float(np_pos_to[0][0]), float(np_pos_to[1][0])
-
