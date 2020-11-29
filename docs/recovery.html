@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>recovery.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div class='section'>
+    <div class='docs'><h1>recovery.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="kn">from</span> <span class="nn">geometry_msgs.msg</span> <span class="kn">import</span> <span class="n">Point</span><span class="p">,</span> <span class="n">Pose</span><span class="p">,</span> <span class="n">Quaternion</span>
+<span class="kn">import</span> <span class="nn">utils</span>
+<span class="kn">import</span> <span class="nn">heapq</span> <span class="kn">as</span> <span class="nn">hq</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">tf</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">class</span> <span class="nc">Recovery</span><span class="p">:</span>
+    <span class="n">EDGE_WEIGHT</span> <span class="o">=</span> <span class="mi">1</span> <span class="c1"># constant edge weight because everything is 1 grid square away from us, may change this</span>
+    <span class="n">SEARCH_RANGE</span> <span class="o">=</span> <span class="mi">5</span> <span class="c1"># grid squares</span>
+    <span class="n">LIDAR_RADIUS</span> <span class="o">=</span> <span class="mi">2</span> <span class="c1"># m</span>
+    <span class="n">RESO</span> <span class="o">=</span> <span class="mf">0.05</span> <span class="c1"># m</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <p>Initialize all instance variables for path finding</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p>for path finding</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">start</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">end</span> <span class="o">=</span> <span class="p">[]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>last known pose of target; right now hard-coded, but later Robot should pass this pose to Recovery object</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">last_known_pos</span> <span class="o">=</span> <span class="n">Point</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_known_pos</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="mi">4</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_known_pos</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="mi">5</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>robot&rsquo;s current pose (pose at which we adopt recovery mode)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">robot_pos</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">robot_ang</span> <span class="o">=</span> <span class="mi">0</span> <span class="c1"># map frame yaw in rads</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>caller must construct local world before path-finding</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">world</span> <span class="o">=</span> <span class="bp">None</span>
+
+        <span class="k">print</span><span class="p">(</span><span class="s2">&quot;init done&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      <p>Construct local world from blobs; must call before calling recover()
+@param blobs: dict of {blob_id:Blob()}</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">create_local_world</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">blobs</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>map metadata</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">world_w</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">Recovery</span><span class="o">.</span><span class="n">LIDAR_RADIUS</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">/</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">RESO</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span> <span class="c1"># account for center position where robot is</span>
+        <span class="n">world_h</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">Recovery</span><span class="o">.</span><span class="n">LIDAR_RADIUS</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">/</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">RESO</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="n">world_res</span> <span class="o">=</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">RESO</span>
+        <span class="n">world_frame</span> <span class="o">=</span> <span class="s2">&quot;map&quot;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      <p>array of obstacles info</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">world_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">world_w</span> <span class="o">*</span> <span class="n">world_h</span><span class="p">,</span> <span class="n">dtype</span> <span class="o">=</span> <span class="nb">int</span><span class="p">)</span>
+        <span class="n">world_arr</span><span class="p">[:]</span> <span class="o">=</span> <span class="mi">2</span>
+        <span class="n">cx</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">world_w</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">cy</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">world_h</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">cx</span> <span class="o">-</span> <span class="nb">int</span><span class="p">(</span><span class="n">Recovery</span><span class="o">.</span><span class="n">LIDAR_RADIUS</span> <span class="o">/</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">RESO</span><span class="p">),</span> <span class="n">cx</span> <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">Recovery</span><span class="o">.</span><span class="n">LIDAR_RADIUS</span> <span class="o">/</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">RESO</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">y</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">cy</span> <span class="o">-</span> <span class="nb">int</span><span class="p">(</span><span class="n">Recovery</span><span class="o">.</span><span class="n">LIDAR_RADIUS</span> <span class="o">/</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">RESO</span><span class="p">),</span> <span class="n">cy</span> <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">Recovery</span><span class="o">.</span><span class="n">LIDAR_RADIUS</span> <span class="o">/</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">RESO</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">x</span><span class="o">-</span><span class="n">cx</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="p">(</span><span class="n">y</span><span class="o">-</span><span class="n">cy</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">&lt;=</span> <span class="p">(</span><span class="n">Recovery</span><span class="o">.</span><span class="n">LIDAR_RADIUS</span> <span class="o">/</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">RESO</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">:</span>
+                    <span class="n">world_arr</span><span class="p">[</span><span class="n">x</span> <span class="o">+</span> <span class="n">y</span> <span class="o">*</span> <span class="n">world_w</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">for</span> <span class="n">blob_id</span> <span class="ow">in</span> <span class="n">blobs</span><span class="p">:</span>
+            <span class="n">arr</span> <span class="o">=</span> <span class="n">blobs</span><span class="p">[</span><span class="n">blob_id</span><span class="p">]</span><span class="o">.</span><span class="n">arr</span>
+            <span class="k">for</span> <span class="n">pos_x</span><span class="p">,</span><span class="n">pos_y</span> <span class="ow">in</span> <span class="n">arr</span><span class="p">:</span>
+                <span class="n">x</span> <span class="o">=</span> <span class="nb">round</span><span class="p">((</span><span class="n">pos_x</span> <span class="o">-</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">robot_pos</span><span class="o">.</span><span class="n">x</span> <span class="o">-</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">LIDAR_RADIUS</span><span class="p">))</span> <span class="o">/</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">RESO</span><span class="p">)</span>
+                <span class="n">y</span> <span class="o">=</span> <span class="nb">round</span><span class="p">((</span><span class="n">pos_y</span> <span class="o">-</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">robot_pos</span><span class="o">.</span><span class="n">y</span> <span class="o">-</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">LIDAR_RADIUS</span><span class="p">))</span> <span class="o">/</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">RESO</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      <p>print(&ldquo;obs at&rdquo;, x, y)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                <span class="n">world_arr</span><span class="p">[</span><span class="n">x</span> <span class="o">+</span> <span class="n">y</span> <span class="o">*</span> <span class="n">world_w</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      <p>info about grid map&rsquo;s pose relative to &lsquo;map&rsquo; frame</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">origin</span> <span class="o">=</span> <span class="n">Pose</span><span class="p">()</span>
+        <span class="n">origin</span><span class="o">.</span><span class="n">position</span> <span class="o">=</span> <span class="n">Point</span><span class="p">()</span>
+        <span class="n">origin</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">robot_pos</span><span class="o">.</span><span class="n">x</span> <span class="o">-</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">LIDAR_RADIUS</span>
+        <span class="n">origin</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">robot_pos</span><span class="o">.</span><span class="n">y</span> <span class="o">-</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">LIDAR_RADIUS</span>
+        <span class="n">origin</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">z</span> <span class="o">=</span> <span class="mi">0</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
+      <p>no rotation</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">origin</span><span class="o">.</span><span class="n">orientation</span> <span class="o">=</span> <span class="n">Quaternion</span><span class="p">()</span>
+        <span class="n">quaternion</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">transformations</span><span class="o">.</span><span class="n">quaternion_from_euler</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">origin</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">quaternion</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">origin</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">y</span> <span class="o">=</span> <span class="n">quaternion</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">origin</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">z</span> <span class="o">=</span> <span class="n">quaternion</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+        <span class="n">origin</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">w</span> <span class="o">=</span> <span class="n">quaternion</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">world</span> <span class="o">=</span> <span class="n">World</span><span class="p">(</span><span class="n">world_arr</span><span class="p">,</span> <span class="n">world_w</span><span class="p">,</span> <span class="n">world_h</span><span class="p">,</span> <span class="n">world_res</span><span class="p">,</span> <span class="n">world_frame</span><span class="p">,</span> <span class="n">origin</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-13'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-13'>#</a>
+      </div>
+      <p>Returns a list of poses in map frame that robot needs to be in, in order to move to last_known_pos
+MUST update self.last_known_pos and self.robot_pos (from Robot object) before calling this!</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">recover</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-14'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-14'>#</a>
+      </div>
+      <p>assume in map frame</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">end</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">last_known_pos</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_known_pos</span><span class="o">.</span><span class="n">y</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">start</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">robot_pos</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">robot_pos</span><span class="o">.</span><span class="n">y</span><span class="p">]</span>
+        <span class="k">print</span><span class="p">(</span><span class="s2">&quot;finding path from &quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span><span class="n">utils</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">[</span><span class="mi">1</span><span class="p">])),</span> <span class="s2">&quot;to &quot;</span><span class="p">,</span>
+                  <span class="p">(</span><span class="n">utils</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span><span class="n">utils</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="p">[</span><span class="mi">1</span><span class="p">])))</span>
+
+        <span class="k">print</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">T</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-15'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-15'>#</a>
+      </div>
+      <p>convert from map to grid; theta doesn&rsquo;t matter here</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">start_grid_x</span><span class="p">,</span> <span class="n">start_grid_y</span><span class="p">,</span> <span class="n">theta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">map_to_grid</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">end_grid_x</span><span class="p">,</span> <span class="n">end_grid_y</span><span class="p">,</span> <span class="n">theta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">map_to_grid</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">0</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-16'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-16'>#</a>
+      </div>
+      <p>convert from grid to cell</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">start_cell_x</span><span class="p">,</span> <span class="n">start_cell_y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">grid_to_cell</span><span class="p">(</span><span class="n">start_grid_x</span><span class="p">,</span> <span class="n">start_grid_y</span><span class="p">)</span>
+        <span class="n">end_cell_x</span><span class="p">,</span> <span class="n">end_cell_y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">grid_to_cell</span><span class="p">(</span><span class="n">end_grid_x</span><span class="p">,</span> <span class="n">end_grid_y</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_near_obs</span><span class="p">(</span><span class="n">end_cell_x</span><span class="p">,</span> <span class="n">end_cell_y</span><span class="p">):</span>
+            <span class="n">end_cell_x</span><span class="p">,</span> <span class="n">end_cell_y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_nearest_free</span><span class="p">(</span><span class="n">end_cell_x</span><span class="p">,</span> <span class="n">end_cell_y</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">end_cell_x</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+                <span class="k">print</span><span class="p">(</span><span class="s2">&quot;error getting nearest free cell&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="p">[]</span>
+
+        <span class="k">print</span><span class="p">(</span><span class="n">start_cell_x</span><span class="p">,</span> <span class="n">start_cell_y</span><span class="p">)</span>
+        <span class="k">print</span><span class="p">(</span><span class="n">end_cell_x</span><span class="p">,</span> <span class="n">end_cell_y</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">start</span> <span class="o">=</span> <span class="p">[</span><span class="n">start_cell_x</span><span class="p">,</span> <span class="n">start_cell_y</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">end</span> <span class="o">=</span> <span class="p">[</span><span class="n">end_cell_x</span><span class="p">,</span> <span class="n">end_cell_y</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-17'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-17'>#</a>
+      </div>
+      <p>check coords are actually on grid</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">on_grid</span><span class="p">(</span><span class="n">start_cell_x</span><span class="p">,</span> <span class="n">start_cell_y</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">on_grid</span><span class="p">(</span><span class="n">end_cell_x</span><span class="p">,</span> <span class="n">end_cell_y</span><span class="p">):</span>
+            <span class="k">print</span><span class="p">(</span><span class="s2">&quot;not on grid&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">[]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-18'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-18'>#</a>
+      </div>
+      <p>if start or end coordinates have obstacle in them, then it&rsquo;s bad input</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_cell</span><span class="p">(</span><span class="n">start_cell_x</span><span class="p">,</span> <span class="n">start_cell_y</span><span class="p">)</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_cell</span><span class="p">(</span><span class="n">end_cell_x</span><span class="p">,</span> <span class="n">end_cell_y</span><span class="p">):</span>
+            <span class="k">print</span><span class="p">(</span><span class="s2">&quot;inside obstacle&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">[]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-19'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-19'>#</a>
+      </div>
+      <p>self.world.data[start_cell_x + start_cell_y * self.world.width] = 5
+self.world.data[end_cell_x + end_cell_y * self.world.width] = 7</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-20'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-20'>#</a>
+      </div>
+      <p>print(&ldquo;MAP IS&rdquo;)
+for h in range(self.world.height):
+   s = &ldquo;[&rdquo;
+   for w in range(self.world.width):
+       s += str(self.world.data[w + h * self.world.width]) + &ldquo;,&rdquo;
+   s += &ldquo;]&rdquo;
+   print(s)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">a_star</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_path_poses</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-21'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-21'>#</a>
+      </div>
+      <p>Returns the nearest cell index x,y that&rsquo;s not within SEARCH_RANGE of an obstacle
+@param x: x index
+@param y: y index</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">get_nearest_free</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-22'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-22'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="n">ny</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">y</span> <span class="o">-</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">SEARCH_RANGE</span> <span class="o">*</span> <span class="mi">2</span><span class="p">),</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">height</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">SEARCH_RANGE</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)):</span>
+            <span class="k">for</span> <span class="n">nx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">x</span> <span class="o">-</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">SEARCH_RANGE</span> <span class="o">*</span> <span class="mi">2</span><span class="p">),</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">width</span><span class="p">,</span> <span class="n">x</span> <span class="o">+</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">SEARCH_RANGE</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)):</span>
+                <span class="k">if</span> <span class="n">ny</span> <span class="o">!=</span> <span class="n">y</span> <span class="ow">or</span> <span class="n">nx</span> <span class="o">!=</span> <span class="n">x</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_near_obs</span><span class="p">(</span><span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">):</span>
+                        <span class="k">return</span> <span class="n">nx</span><span class="p">,</span> <span class="n">ny</span>
+
+        <span class="k">return</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-23'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-23'>#</a>
+      </div>
+      <p>Returns diagonal distance from curr_x,curr_y to self.end[0],self.end[1]&ndash;BOTH IN CELL COORDS
+@param curr_x: current x cell index whose diagonal distance to end we want
+@param curr_y: current y cell index</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">diagonal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">curr_x</span><span class="p">,</span> <span class="n">curr_y</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-24'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-24'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">dx</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">curr_x</span><span class="p">)</span>
+        <span class="n">dy</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">curr_y</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">dx</span> <span class="o">+</span> <span class="n">dy</span><span class="p">)</span> <span class="o">-</span> <span class="nb">min</span><span class="p">(</span><span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-25'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-25'>#</a>
+      </div>
+      <p>Implements A* algorithm to find path from start to goal
+Assumes movement up, down, left, right only
+Actual cost is always 1 because every next cell should be just 1 cell away from curr cell</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">a_star</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-26'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-26'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">start</span> <span class="o">=</span> <span class="n">Cell</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">)</span>
+        <span class="n">goal</span> <span class="o">=</span> <span class="n">Cell</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-27'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-27'>#</a>
+      </div>
+      <p>stores (Cell objs, heuristic)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">open_set</span> <span class="o">=</span> <span class="p">[]</span> <span class="c1"># min heap weighted by heuristic/diagonal to goal</span>
+        <span class="n">hq</span><span class="o">.</span><span class="n">heappush</span><span class="p">(</span><span class="n">open_set</span><span class="p">,</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">diagonal</span><span class="p">(</span><span class="n">start</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">start</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="n">start</span><span class="p">))</span>
+
+        <span class="n">closed_set</span> <span class="o">=</span> <span class="p">{}</span> <span class="c1"># dict maps curr_node:parent_node for back tracing later</span>
+
+        <span class="n">closed_set_angles</span> <span class="o">=</span> <span class="p">{}</span> <span class="c1"># maps curr_node:optimal angle to get here from prev node</span>
+ 
+        <span class="n">closed_set_angles</span><span class="p">[</span><span class="n">start</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">robot_ang</span>
+
+        <span class="n">g_vals</span> <span class="o">=</span> <span class="p">{}</span> <span class="c1"># dict maps node to actual cost to get from start to node</span>
+        <span class="n">g_vals</span><span class="p">[</span><span class="n">start</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">open_set</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-28'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-28'>#</a>
+      </div>
+      <p>get next lowest in open set; 1st index is Cell obj because 0th index is diagonal</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">curr</span> <span class="o">=</span> <span class="n">hq</span><span class="o">.</span><span class="n">heappop</span><span class="p">(</span><span class="n">open_set</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-29'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-29'>#</a>
+      </div>
+      <p>we&rsquo;ve found goal, back trace and return</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="n">curr</span> <span class="o">==</span> <span class="n">goal</span><span class="p">:</span>
+                <span class="k">print</span><span class="p">(</span><span class="s2">&quot;found&quot;</span><span class="p">)</span>
+                <span class="n">path</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">while</span> <span class="n">curr</span> <span class="ow">in</span> <span class="n">closed_set</span><span class="p">:</span>
+                    <span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">curr</span><span class="p">)</span>
+                    <span class="n">curr</span> <span class="o">=</span> <span class="n">closed_set</span><span class="p">[</span><span class="n">curr</span><span class="p">]</span>
+                <span class="k">print</span><span class="p">(</span><span class="s2">&quot;found 1&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">path</span> <span class="c1"># [goal, ..., c, b, a] reversed so we can pop() later</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-30'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-30'>#</a>
+      </div>
+      <p>look at all neighbors in y dir</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">cx</span> <span class="o">=</span> <span class="n">curr</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">cy</span> <span class="o">=</span> <span class="n">curr</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">ny</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">cy</span> <span class="o">-</span> <span class="mi">1</span><span class="p">),</span> <span class="nb">min</span><span class="p">(</span><span class="n">cy</span> <span class="o">+</span> <span class="mi">2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">height</span><span class="p">)):</span>
+                <span class="k">for</span> <span class="n">nx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">cx</span> <span class="o">-</span> <span class="mi">1</span><span class="p">),</span> <span class="nb">min</span><span class="p">(</span><span class="n">cx</span> <span class="o">+</span> <span class="mi">2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">width</span><span class="p">)):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-31'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-31'>#</a>
+      </div>
+      <p>if not current cell and doesn&rsquo;t have obstacle</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                    <span class="k">if</span> <span class="p">(</span><span class="n">cy</span> <span class="o">!=</span> <span class="n">ny</span> <span class="ow">or</span> <span class="n">cx</span> <span class="o">!=</span> <span class="n">nx</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_cell</span><span class="p">(</span><span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_near_obs</span><span class="p">(</span><span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">):</span>
+                        <span class="n">n</span> <span class="o">=</span> <span class="n">Cell</span><span class="p">([</span><span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">])</span>
+                        <span class="n">temp_yaw</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_rotate_yaw</span><span class="p">(</span><span class="n">cx</span><span class="p">,</span> <span class="n">cy</span><span class="p">,</span> <span class="n">closed_set_angles</span><span class="p">[</span><span class="n">curr</span><span class="p">],</span> <span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">)</span>
+                        <span class="n">temp_g</span> <span class="o">=</span> <span class="n">g_vals</span><span class="p">[</span><span class="n">curr</span><span class="p">]</span> <span class="o">+</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">EDGE_WEIGHT</span> <span class="o">+</span> <span class="nb">abs</span><span class="p">(</span><span class="n">temp_yaw</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-32'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-32'>#</a>
+      </div>
+      <p>if cost from start to n is lowest so far, or no cost calculated yet</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                        <span class="k">if</span> <span class="p">(</span><span class="n">n</span> <span class="ow">in</span> <span class="n">g_vals</span> <span class="ow">and</span> <span class="n">temp_g</span> <span class="o">&lt;</span> <span class="n">g_vals</span><span class="p">[</span><span class="n">n</span><span class="p">])</span> <span class="ow">or</span> <span class="p">(</span><span class="n">n</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">g_vals</span><span class="p">):</span>
+                            <span class="n">closed_set</span><span class="p">[</span><span class="n">n</span><span class="p">]</span> <span class="o">=</span> <span class="n">curr</span> <span class="c1"># update shortest path to n</span>
+                            <span class="n">closed_set_angles</span><span class="p">[</span><span class="n">n</span><span class="p">]</span> <span class="o">=</span> <span class="n">temp_yaw</span>
+                            <span class="n">g_vals</span><span class="p">[</span><span class="n">n</span><span class="p">]</span> <span class="o">=</span> <span class="n">temp_g</span>
+                            <span class="n">temp_f</span> <span class="o">=</span> <span class="n">g_vals</span><span class="p">[</span><span class="n">n</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">diagonal</span><span class="p">(</span><span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">)</span>
+                            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">open_set</span><span class="p">)):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-33'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-33'>#</a>
+      </div>
+      <p>remove n from open set if already there</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                                <span class="k">if</span> <span class="n">open_set</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">n</span><span class="p">:</span>
+                                    <span class="k">del</span> <span class="n">open_set</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                                    <span class="k">break</span>
+                            <span class="n">hq</span><span class="o">.</span><span class="n">heappush</span><span class="p">(</span><span class="n">open_set</span><span class="p">,</span> <span class="p">(</span><span class="n">temp_f</span><span class="p">,</span> <span class="n">n</span><span class="p">))</span>
+                            <span class="n">hq</span><span class="o">.</span><span class="n">heapify</span><span class="p">(</span><span class="n">open_set</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">[]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-34'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-34'>#</a>
+      </div>
+      <p>Get the amount to rotate to cell index (x2,y2) given robot is at index (x1,y1) with yaw1
+@param x1: curr cell x index
+@param y1: curr cell y index
+@param yaw1: yaw in curr cell
+@param x2: next cell x index
+@param y2: next cell y index</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">get_rotate_yaw</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x1</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">yaw1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">y2</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-35'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-35'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="n">x2</span> <span class="o">==</span> <span class="n">x1</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-36'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-36'>#</a>
+      </div>
+      <p>next cell below</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="n">y2</span> <span class="o">&lt;</span> <span class="n">y1</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">-</span> <span class="n">yaw1</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-37'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-37'>#</a>
+      </div>
+      <p>next cell above</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="n">y2</span> <span class="o">&gt;</span> <span class="n">y1</span><span class="p">:</span>
+                <span class="k">return</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">-</span> <span class="n">yaw1</span>
+        <span class="k">if</span> <span class="n">y2</span> <span class="o">==</span> <span class="n">y1</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-38'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-38'>#</a>
+      </div>
+      <p>next cell behind</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="n">x2</span> <span class="o">&lt;</span> <span class="n">x1</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">-</span> <span class="n">yaw1</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-39'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-39'>#</a>
+      </div>
+      <p>next cell ahead</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="n">x2</span> <span class="o">&gt;</span> <span class="n">x1</span><span class="p">:</span>
+                <span class="k">return</span> <span class="mi">0</span> <span class="o">-</span> <span class="n">yaw1</span>
+        <span class="k">if</span> <span class="n">x2</span> <span class="o">&lt;</span> <span class="n">x1</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-40'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-40'>#</a>
+      </div>
+      <p>next cell top left</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="n">y2</span> <span class="o">&lt;</span> <span class="n">y1</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="mf">0.75</span> <span class="o">-</span> <span class="n">yaw1</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-41'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-41'>#</a>
+      </div>
+      <p>next cell bot left</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="n">y2</span> <span class="o">&gt;</span> <span class="n">y1</span><span class="p">:</span>
+                <span class="k">return</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="mf">0.75</span> <span class="o">-</span> <span class="n">yaw1</span>
+        <span class="k">if</span> <span class="n">x2</span> <span class="o">&gt;</span> <span class="n">x1</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-42'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-42'>#</a>
+      </div>
+      <p>next cell top right</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="n">y2</span> <span class="o">&lt;</span> <span class="n">y1</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="mf">0.25</span> <span class="o">-</span> <span class="n">yaw1</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-43'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-43'>#</a>
+      </div>
+      <p>next cell bot right</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="n">y2</span> <span class="o">&gt;</span> <span class="n">y1</span><span class="p">:</span>
+                <span class="k">return</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="mf">0.25</span> <span class="o">-</span> <span class="n">yaw1</span>
+        <span class="k">print</span><span class="p">(</span><span class="s2">&quot;ERROR IN GET YAW ROTATE&quot;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-44'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-44'>#</a>
+      </div>
+      <p>Check if cell index at x,y is near a rock, to take into account of robot size in map
+@param x: curr cell x index
+@param y: curr cell y index</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">is_near_obs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-45'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-45'>#</a>
+      </div>
+      <p>checks within 5 grid squares around curr cell</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="n">ny</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">y</span> <span class="o">-</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">SEARCH_RANGE</span><span class="p">),</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">height</span><span class="p">,</span> <span class="n">y</span> <span class="o">+</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">SEARCH_RANGE</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)):</span>
+            <span class="k">for</span> <span class="n">nx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">x</span> <span class="o">-</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">SEARCH_RANGE</span><span class="p">),</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">width</span><span class="p">,</span> <span class="n">x</span> <span class="o">+</span> <span class="n">Recovery</span><span class="o">.</span><span class="n">SEARCH_RANGE</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)):</span>
+                <span class="k">if</span> <span class="n">nx</span> <span class="o">!=</span> <span class="n">x</span> <span class="ow">or</span> <span class="n">ny</span> <span class="o">!=</span> <span class="n">y</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">get_cell</span><span class="p">(</span><span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">):</span> <span class="c1"># has obstacle</span>
+                        <span class="k">return</span> <span class="bp">True</span>
+        <span class="k">return</span> <span class="bp">False</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-46'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-46'>#</a>
+      </div>
+      <p>Get poses in map as list of [x, y, yaw] from list of cell coordinates/indexes
+Assumes movement up, down, left, right only
+@param path: list of cell indexes in format [x, y]</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">get_path_poses</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-47'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-47'>#</a>
+      </div>
+      <p>returns 2D list where items are [x, y, yaw] in map frame</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">poses</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">px</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="n">py</span> <span class="o">=</span> <span class="bp">None</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">path</span><span class="p">)):</span>
+            <span class="n">cx</span> <span class="o">=</span> <span class="n">path</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">cy</span> <span class="o">=</span> <span class="n">path</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-48'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-48'>#</a>
+      </div>
+      <p>don&rsquo;t add redundant cells</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="p">(</span><span class="n">px</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">&lt;=</span> <span class="n">cx</span> <span class="o">&lt;=</span> <span class="n">px</span> <span class="o">+</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">py</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">&lt;=</span> <span class="n">cy</span> <span class="o">&lt;=</span> <span class="n">py</span> <span class="o">+</span> <span class="mi">2</span><span class="p">):</span>
+                <span class="k">continue</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-49'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-49'>#</a>
+      </div>
+      <p>get x,y in grid</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">grid_x</span><span class="p">,</span> <span class="n">grid_y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">cell_to_grid</span><span class="p">(</span><span class="n">cx</span><span class="p">,</span> <span class="n">cy</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-50'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-50'>#</a>
+      </div>
+      <p>get x,y in map; yaw doesn&rsquo;t matter</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">map_x</span><span class="p">,</span> <span class="n">map_y</span><span class="p">,</span> <span class="n">map_yaw</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">world</span><span class="o">.</span><span class="n">grid_to_map</span><span class="p">(</span><span class="n">grid_x</span><span class="p">,</span> <span class="n">grid_y</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">poses</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">map_x</span><span class="p">,</span> <span class="n">map_y</span><span class="p">])</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-51'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-51'>#</a>
+      </div>
+      <p>update prev cells</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">px</span> <span class="o">=</span> <span class="n">cx</span>
+            <span class="n">py</span> <span class="o">=</span> <span class="n">cy</span>
+        <span class="k">return</span> <span class="n">poses</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-52'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-52'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">class</span> <span class="nc">World</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-53'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-53'>#</a>
+      </div>
+      <p>Initialize all info needed for transformations btwn grid &amp; map and looking up cells
+@param data: row-major array or list of obstacle info in map, which is divided into grid cells
+@param width: world width
+@param height: world height
+@param reso: map resolution (for grids)
+@param frame: relative frame that determines grid map position
+@param origin: origin of grid map (bot left corner) relative to frame</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">,</span> <span class="n">reso</span><span class="p">,</span> <span class="n">frame</span><span class="p">,</span> <span class="n">origin</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-54'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-54'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">data</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">width</span> <span class="o">=</span> <span class="n">width</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">height</span> <span class="o">=</span> <span class="n">height</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reso</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">reso</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">frame</span> <span class="o">=</span> <span class="n">frame</span> <span class="c1"># map frame</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">origin</span> <span class="o">=</span> <span class="p">[]</span> <span class="c1"># [x,y,yaw] representation of maze pose in map frame</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">origin</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">x</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">origin</span><span class="o">.</span><span class="n">position</span><span class="o">.</span><span class="n">y</span><span class="p">)</span>
+        <span class="n">rpy</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">transformations</span><span class="o">.</span><span class="n">euler_from_quaternion</span><span class="p">((</span><span class="n">origin</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">origin</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">origin</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">z</span><span class="p">,</span> <span class="n">origin</span><span class="o">.</span><span class="n">orientation</span><span class="o">.</span><span class="n">w</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">rpy</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="c1"># yaw is 3rd element</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">T</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span> <span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span> <span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="p">[</span><span class="mi">1</span><span class="p">]],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]])</span> <span class="c1"># transformation matrix from occ_grid to map frame</span>
+        <span class="k">print</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">T</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-55'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-55'>#</a>
+      </div>
+      <p>Return whether cell at x,y index has obstacle
+@param x: cell index in horz direction
+@param y: cell index in vert direction</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">get_cell</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-56'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-56'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">x</span> <span class="o">+</span> <span class="n">y</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">width</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-57'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-57'>#</a>
+      </div>
+      <p>Transform x,y,yaw in map to grid
+@param x: cell index in horz direction
+@param y: cell index in vert direction
+@param theta: yaw to convert       </p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">map_to_grid</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">theta</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-58'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-58'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">grid_pose</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">T</span><span class="p">)</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])))</span>
+        <span class="n">grid_theta</span> <span class="o">=</span> <span class="n">theta</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">grid_pose</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">grid_pose</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">grid_theta</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-59'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-59'>#</a>
+      </div>
+      <p>Transform x,y,yaw in grid to map
+@param x: cell index in horz direction
+@param y: cell index in vert direction
+@param theta: yaw to convert       </p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">grid_to_map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">theta</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-60'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-60'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">map_pose</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])))</span>
+        <span class="n">map_theta</span> <span class="o">=</span> <span class="n">theta</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">origin</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">map_pose</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">map_pose</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">map_theta</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-61'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-61'>#</a>
+      </div>
+      <p>Transform x,y grid coordinates in meters to cell indexes
+@param x: distance in x-axis
+@param y: distance in y-axis</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">grid_to_cell</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-62'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-62'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">return</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">x</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">reso</span><span class="p">)),</span> <span class="nb">int</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">y</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">reso</span><span class="p">)))</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-63'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-63'>#</a>
+      </div>
+      <p>Transform x,y cell indexes to grid coordinates, rounded to be center of cell
+@param x: cell index in horz direction
+@param y: cell index in vert direction</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">cell_to_grid</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span> <span class="p">,</span> <span class="n">y</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-64'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-64'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">return</span> <span class="p">((</span><span class="n">x</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">reso</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">reso</span> <span class="o">/</span> <span class="mi">2</span><span class="p">),</span> <span class="p">(</span><span class="n">y</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">reso</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">reso</span> <span class="o">/</span> <span class="mi">2</span><span class="p">))</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-65'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-65'>#</a>
+      </div>
+      <p>Returns whether x,y cell indexes are on grid
+@param x: cell index in horz direction
+@param y: cell index in vert direction</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">on_grid</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-66'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-66'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">return</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">width</span> <span class="ow">and</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">y</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">height</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-67'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-67'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">class</span> <span class="nc">Cell</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-68'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-68'>#</a>
+      </div>
+      <p>Stores only [x,y] coords/indexes in grid
+@param coords: list of form [x,y] indicating cell index</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coords</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-69'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-69'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">coords</span> <span class="o">=</span> <span class="n">coords</span> <span class="c1"># expect [x,y] list</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-70'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-70'>#</a>
+      </div>
+      <p>To make checks like &lsquo;if c in dict&rsquo; work</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-71'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-71'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-72'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-72'>#</a>
+      </div>
+      <p>To make checks like &lsquo;if c in dict&rsquo; and &lsquo;if c == c1&rsquo; work
+@param other: another Cell object to compare to</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-73'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-73'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-74'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-74'>#</a>
+      </div>
+      <p>To make checks like &lsquo;if c in dict&rsquo; and &lsquo;if c == c1&rsquo; work
+@param other: another Cell object to compare to</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">__ne__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-75'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-75'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">other</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">other</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-76'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-76'>#</a>
+      </div>
+      <p>For debug prints</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-77'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-77'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">+</span> <span class="s2">&quot;,&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">coords</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

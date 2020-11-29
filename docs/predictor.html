@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>predictor.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div class='section'>
+    <div class='docs'><h1>predictor.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="kn">import</span> <span class="nn">rospy</span>
+<span class="kn">from</span> <span class="nn">geometry_msgs.msg</span> <span class="kn">import</span> <span class="n">Twist</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">random</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>PREDICTOR.PY 
+class to predict robot movement</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="n">FREQ</span> <span class="o">=</span> <span class="mi">10</span> <span class="c1"># Hz</span>
+<span class="n">SLEEP</span> <span class="o">=</span> <span class="mi">2</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">class</span> <span class="nc">Predictor</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>target poses</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="bp">self</span><span class="o">.</span><span class="n">poses</span> <span class="o">=</span> <span class="p">[]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>predicted target velocities</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="bp">self</span><span class="o">.</span><span class="n">predx_vel</span> <span class="o">=</span> <span class="mi">0</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">predy_vel</span> <span class="o">=</span> <span class="mi">0</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>given pose information, updating instance variable for Predictors</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	<span class="k">def</span> <span class="nf">update_targetpos</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">posx</span><span class="p">,</span> <span class="n">posy</span><span class="p">,</span> <span class="n">xvel</span><span class="p">,</span> <span class="n">yvel</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      <pre><code>    Adding pose information to poses list
+    @params posx, posy, xvel, yvel: taken from Identifier and called in Robot
+</code></pre>
+<p>if the target was not found, clearing the poses list and returning</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="k">if</span> <span class="bp">None</span> <span class="ow">in</span> <span class="p">[</span><span class="n">posx</span><span class="p">,</span> <span class="n">posy</span><span class="p">,</span> <span class="n">xvel</span><span class="p">,</span> <span class="n">yvel</span><span class="p">]:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">poses</span> <span class="o">=</span> <span class="p">[]</span>
+			<span class="k">return</span> <span class="bp">None</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>creating new instance of pose class</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="n">target</span> <span class="o">=</span> <span class="n">Pose</span><span class="p">(</span><span class="n">posx</span><span class="p">,</span> <span class="n">posy</span><span class="p">,</span> <span class="n">xvel</span><span class="p">,</span> <span class="n">yvel</span><span class="p">)</span>
+		<span class="n">last</span> <span class="o">=</span> <span class="bp">None</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      <p>with more than one observation, velocities are there</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">:</span>
+			<span class="n">last</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      <p>getting acceleration</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>			<span class="n">target</span><span class="o">.</span><span class="n">set_xaccel</span><span class="p">(</span> <span class="n">target</span><span class="o">.</span><span class="n">get_xvel</span><span class="p">()</span> <span class="o">-</span> <span class="n">last</span><span class="o">.</span><span class="n">get_xvel</span><span class="p">()</span> <span class="p">)</span> 
+			<span class="n">target</span><span class="o">.</span><span class="n">set_yaccel</span><span class="p">(</span> <span class="n">target</span><span class="o">.</span><span class="n">get_yvel</span><span class="p">()</span> <span class="o">-</span> <span class="n">last</span><span class="o">.</span><span class="n">get_yvel</span><span class="p">()</span> <span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      <p>with more than two observations, accelerations are there</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">:</span>
+			<span class="n">target</span><span class="o">.</span><span class="n">set_xthird</span><span class="p">(</span> <span class="n">target</span><span class="o">.</span><span class="n">get_xaccel</span><span class="p">()</span> <span class="o">-</span> <span class="n">last</span><span class="o">.</span><span class="n">get_xaccel</span><span class="p">()</span> <span class="p">)</span> 
+			<span class="n">target</span><span class="o">.</span><span class="n">set_ythird</span><span class="p">(</span> <span class="n">target</span><span class="o">.</span><span class="n">get_yaccel</span><span class="p">()</span> <span class="o">-</span> <span class="n">last</span><span class="o">.</span><span class="n">get_yaccel</span><span class="p">()</span> <span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
+      <p>adding new pose to the poses list</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">target</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-13'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-13'>#</a>
+      </div>
+      <p>advanced version of prediction </p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	<span class="k">def</span> <span class="nf">predict_hd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">lookahead</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-14'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-14'>#</a>
+      </div>
+      <pre><code>    Returns next lookahead predicted poses; Called in Robot
+    @params dt: change in time between poses, lookahead, number of poses wanted
+</code></pre>
+<p>skipping if there is nothing in the list and therefore returning empty list of poses for predict</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="p">)</span><span class="o">&lt;</span><span class="mi">1</span><span class="p">:</span>
+			<span class="k">return</span> <span class="p">[]</span>
+
+		<span class="n">total_xthird</span> <span class="o">=</span> <span class="mi">0</span>
+		<span class="n">total_ythird</span> <span class="o">=</span> <span class="mi">0</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-15'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-15'>#</a>
+      </div>
+      <p>summing over all the poses in the list</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="p">:</span>
+			<span class="n">xthird</span> <span class="o">=</span> <span class="n">pose</span><span class="o">.</span><span class="n">get_xthird</span><span class="p">()</span>
+			<span class="n">ythird</span> <span class="o">=</span> <span class="n">pose</span><span class="o">.</span><span class="n">get_ythird</span><span class="p">()</span>
+			<span class="k">if</span> <span class="n">xthird</span><span class="o">!=</span><span class="bp">None</span> <span class="ow">and</span> <span class="n">ythird</span><span class="o">!=</span><span class="bp">None</span><span class="p">:</span>
+				<span class="n">total_xthird</span> <span class="o">+=</span> <span class="n">xthird</span> 
+				<span class="n">total_ythird</span> <span class="o">+=</span> <span class="n">ythird</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-16'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-16'>#</a>
+      </div>
+      <p>averaging the third value over all the values</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="n">avg_xthird</span> <span class="o">=</span> <span class="n">total_xthird</span><span class="o">/</span><span class="p">(</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="p">)</span> <span class="p">)</span>
+		<span class="n">avg_ythird</span> <span class="o">=</span> <span class="n">total_ythird</span><span class="o">/</span><span class="p">(</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="p">)</span> <span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-17'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-17'>#</a>
+      </div>
+      <p>if there were no actual third observations, randomizing</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="k">if</span> <span class="n">avg_xthird</span><span class="o">==</span><span class="mi">0</span> <span class="ow">and</span> <span class="n">avg_ythird</span><span class="o">==</span><span class="mi">0</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-18'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-18'>#</a>
+      </div>
+      <p>https://docs.python.org/3/library/random.html</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>			<span class="n">avg_xthird</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+			<span class="n">avg_ythird</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-19'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-19'>#</a>
+      </div>
+      <p>these above average_third values are jerk values that will be used for the next prediction</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="n">last_obs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-20'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-20'>#</a>
+      </div>
+      <p>if the there are more observations in the list, having the predicted values be &lsquo;integrals&rsquo;</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="n">predposes</span> <span class="o">=</span> <span class="p">[]</span>	
+		<span class="n">predvel</span> <span class="o">=</span> <span class="p">[]</span>
+		<span class="n">predacc</span> <span class="o">=</span> <span class="p">[]</span>
+		<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-21'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-21'>#</a>
+      </div>
+      <p>creating projected poses, adding the first one</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>			<span class="n">new_xaccel</span> <span class="o">=</span> <span class="n">last_obs</span><span class="o">.</span><span class="n">get_xaccel</span><span class="p">()</span> <span class="o">+</span> <span class="n">avg_xthird</span>
+			<span class="n">new_yaccel</span> <span class="o">=</span> <span class="n">last_obs</span><span class="o">.</span><span class="n">get_yaccel</span><span class="p">()</span> <span class="o">+</span> <span class="n">avg_ythird</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-22'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-22'>#</a>
+      </div>
+      <p>predicted velocities</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>			<span class="bp">self</span><span class="o">.</span><span class="n">predx_vel</span> <span class="o">=</span> <span class="n">last_obs</span><span class="o">.</span><span class="n">get_xvel</span><span class="p">()</span> <span class="o">+</span> <span class="n">new_xaccel</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">predy_vel</span> <span class="o">=</span> <span class="n">last_obs</span><span class="o">.</span><span class="n">get_yvel</span><span class="p">()</span> <span class="o">+</span> <span class="n">new_yaccel</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-23'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-23'>#</a>
+      </div>
+      <p>normalizing if either of the velocities are greater than one</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>			<span class="p">(</span><span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">predx_vel</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">predy_vel</span><span class="p">)</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">predx_vel</span> <span class="o">=</span> <span class="n">nx</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">predy_vel</span> <span class="o">=</span> <span class="n">ny</span>
+			<span class="n">predacc</span><span class="o">.</span><span class="n">append</span><span class="p">(</span> <span class="p">(</span><span class="n">new_xaccel</span><span class="p">,</span> <span class="n">new_yaccel</span><span class="p">)</span> <span class="p">)</span> 
+					
+		<span class="k">else</span><span class="p">:</span> <span class="c1"># using the last velocity until enough observations</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-24'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-24'>#</a>
+      </div>
+      <p>just using the last observations velocity as the predicted</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>			<span class="bp">self</span><span class="o">.</span><span class="n">predx_vel</span> <span class="o">=</span> <span class="n">last_obs</span><span class="o">.</span><span class="n">get_xvel</span><span class="p">()</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">predy_vel</span> <span class="o">=</span> <span class="n">last_obs</span><span class="o">.</span><span class="n">get_yvel</span><span class="p">()</span>
+			<span class="n">predacc</span><span class="o">.</span><span class="n">append</span><span class="p">(</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-25'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-25'>#</a>
+      </div>
+      <p>creating velocities and x</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="n">xnew</span> <span class="o">=</span> <span class="n">last_obs</span><span class="o">.</span><span class="n">get_posx</span><span class="p">()</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">predx_vel</span><span class="o">*</span><span class="n">dt</span>
+		<span class="n">ynew</span> <span class="o">=</span> <span class="n">last_obs</span><span class="o">.</span><span class="n">get_posy</span><span class="p">()</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">predy_vel</span><span class="o">*</span><span class="n">dt</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-26'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-26'>#</a>
+      </div>
+      <p>appending to poses and velocities</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="n">predposes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span> <span class="p">(</span><span class="n">xnew</span><span class="p">,</span> <span class="n">ynew</span><span class="p">)</span> <span class="p">)</span>
+		<span class="n">predvel</span><span class="o">.</span><span class="n">append</span><span class="p">(</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">predx_vel</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">predy_vel</span><span class="p">)</span> <span class="p">)</span>
+		
+	
+		<span class="n">i</span> <span class="o">=</span> <span class="mi">0</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-27'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-27'>#</a>
+      </div>
+      <p>already looked ahead once, looking ahead again</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="k">while</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">lookahead</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-28'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-28'>#</a>
+      </div>
+      <p>adding previously predicted acc to the jerk </p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>			<span class="n">new_xaccel</span> <span class="o">=</span> <span class="n">predacc</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">avg_xthird</span>
+			<span class="n">new_yaccel</span> <span class="o">=</span> <span class="n">predacc</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">avg_ythird</span>
+			<span class="n">predacc</span><span class="o">.</span><span class="n">append</span><span class="p">(</span> <span class="p">(</span><span class="n">new_xaccel</span><span class="p">,</span> <span class="n">new_yaccel</span><span class="p">)</span> <span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-29'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-29'>#</a>
+      </div>
+      <p>getting new velocities</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>			<span class="n">predx_vel</span> <span class="o">=</span> <span class="n">predvel</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">new_xaccel</span>
+			<span class="n">predy_vel</span> <span class="o">=</span> <span class="n">predvel</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">new_yaccel</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-30'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-30'>#</a>
+      </div>
+      <p>normalizing velocities</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>			<span class="p">(</span><span class="n">nvx</span><span class="p">,</span> <span class="n">nvy</span><span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize</span><span class="p">(</span><span class="n">predx_vel</span><span class="p">,</span> <span class="n">predy_vel</span><span class="p">)</span>
+			<span class="n">predvel</span><span class="o">.</span><span class="n">append</span><span class="p">(</span> <span class="p">(</span><span class="n">nvx</span><span class="p">,</span> <span class="n">nvy</span><span class="p">)</span> <span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-31'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-31'>#</a>
+      </div>
+      <p>predicting new pose</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>			<span class="n">xnew</span> <span class="o">=</span> <span class="n">predposes</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">nvx</span><span class="o">*</span><span class="n">dt</span>
+			<span class="n">ynew</span> <span class="o">=</span> <span class="n">predposes</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">nvy</span><span class="o">*</span><span class="n">dt</span>
+			<span class="n">predposes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span> <span class="p">(</span><span class="n">xnew</span><span class="p">,</span> <span class="n">ynew</span><span class="p">)</span> <span class="p">)</span>
+			<span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-32'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-32'>#</a>
+      </div>
+      <p>returning the predicted velocities in the tuple and the next N poses</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="k">print</span> <span class="n">predposes</span>
+		<span class="k">return</span>  <span class="n">predposes</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-33'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-33'>#</a>
+      </div>
+      <p>function that normalizes velocity</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	<span class="k">def</span> <span class="nf">normalize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-34'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-34'>#</a>
+      </div>
+      <pre><code>    Returns normalized valyes for x and y;
+    @params x, y: velocities
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>		<span class="k">if</span> <span class="n">x</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">y</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+			<span class="n">newx</span> <span class="o">=</span> <span class="n">x</span> <span class="o">/</span> <span class="p">(</span> <span class="n">x</span> <span class="o">*</span> <span class="n">x</span> <span class="o">+</span> <span class="n">y</span> <span class="o">*</span> <span class="n">y</span><span class="p">)</span>
+			<span class="n">newy</span> <span class="o">=</span> <span class="n">y</span> <span class="o">/</span> <span class="p">(</span> <span class="n">x</span> <span class="o">*</span> <span class="n">x</span> <span class="o">+</span> <span class="n">y</span> <span class="o">*</span> <span class="n">y</span><span class="p">)</span>
+			<span class="k">return</span> <span class="p">(</span><span class="n">newx</span><span class="p">,</span> <span class="n">newy</span><span class="p">)</span>
+		<span class="k">else</span><span class="p">:</span> 
+			<span class="k">return</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-35'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-35'>#</a>
+      </div>
+      <p>mini class that has all the current information on target&rsquo;s whereabouts</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">class</span> <span class="nc">Pose</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-36'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-36'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">positionx</span><span class="p">,</span> <span class="n">positiony</span><span class="p">,</span> <span class="n">xvelocity</span><span class="p">,</span> <span class="n">yvelocity</span><span class="p">):</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">posx</span> <span class="o">=</span> <span class="n">positionx</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">posy</span> <span class="o">=</span> <span class="n">positiony</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">xvel</span> <span class="o">=</span> <span class="n">xvelocity</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">yvel</span> <span class="o">=</span> <span class="n">yvelocity</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">xaccel</span> <span class="o">=</span> <span class="bp">None</span>	
+		<span class="bp">self</span><span class="o">.</span><span class="n">yaccel</span> <span class="o">=</span> <span class="bp">None</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">xthird</span> <span class="o">=</span> <span class="bp">None</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">ythird</span> <span class="o">=</span> <span class="bp">None</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-37'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-37'>#</a>
+      </div>
+      <p>getter functions</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	<span class="k">def</span> <span class="nf">get_posx</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">posx</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-38'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-38'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	<span class="k">def</span> <span class="nf">get_posy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">posy</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-39'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-39'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	<span class="k">def</span> <span class="nf">get_xvel</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">xvel</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-40'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-40'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	<span class="k">def</span> <span class="nf">get_yvel</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">yvel</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-41'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-41'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	<span class="k">def</span> <span class="nf">get_xaccel</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">xaccel</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-42'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-42'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	<span class="k">def</span> <span class="nf">get_yaccel</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">yaccel</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-43'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-43'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	<span class="k">def</span> <span class="nf">get_xthird</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">xthird</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-44'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-44'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	<span class="k">def</span> <span class="nf">get_ythird</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ythird</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-45'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-45'>#</a>
+      </div>
+      <p>setter functions</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	<span class="k">def</span> <span class="nf">set_xaccel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">xaccel</span> <span class="o">=</span> <span class="n">value</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-46'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-46'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	<span class="k">def</span> <span class="nf">set_yaccel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">yaccel</span> <span class="o">=</span> <span class="n">value</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-47'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-47'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	<span class="k">def</span> <span class="nf">set_xthird</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">xthird</span> <span class="o">=</span> <span class="n">value</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-48'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-48'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>	<span class="k">def</span> <span class="nf">set_ythird</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">ythird</span> <span class="o">=</span> <span class="n">value</span>
+		
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+
+	<span class="n">p</span> <span class="o">=</span> <span class="n">Predictor</span><span class="p">()</span>
+	<span class="n">p</span><span class="o">.</span><span class="n">main</span><span class="p">()</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>
