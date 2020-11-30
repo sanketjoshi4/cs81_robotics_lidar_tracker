@@ -7,10 +7,10 @@ import tf
 
 
 class Recovery:
-    EDGE_WEIGHT = 1 # constant edge weight because everything is 1 grid square away from us, may change this
-    SEARCH_RANGE = 5 # grid squares
-    LIDAR_RADIUS = 2 # m
-    RESO = 0.05 # m
+    EDGE_WEIGHT = 1  # constant edge weight because everything is 1 grid square away from us, may change this
+    SEARCH_RANGE = 5  # grid squares
+    LIDAR_RADIUS = 2  # m
+    RESO = 0.05  # m
 
     def __init__(self):
         """
@@ -27,7 +27,7 @@ class Recovery:
 
         # robot's current pose (pose at which we adopt recovery mode)
         self.robot_pos = None
-        self.robot_ang = 0 # map frame yaw in rads
+        self.robot_ang = 0  # map frame yaw in rads
 
         # caller must construct local world before path-finding
         self.world = None
@@ -40,29 +40,30 @@ class Recovery:
         @param blobs: dict of {blob_id:Blob()}
         """
         # map metadata
-        world_w = int(Recovery.LIDAR_RADIUS * 2 / Recovery.RESO) + 1 # account for center position where robot is
+        world_w = int(Recovery.LIDAR_RADIUS * 2 / Recovery.RESO) + 1  # account for center position where robot is
         world_h = int(Recovery.LIDAR_RADIUS * 2 / Recovery.RESO) + 1
         world_res = Recovery.RESO
         world_frame = "map"
 
         # array of obstacles info
-        world_arr = np.zeros(world_w * world_h, dtype = int)
+        world_arr = np.zeros(world_w * world_h, dtype=int)
         world_arr[:] = 2
         cx = int(world_w / 2)
         cy = int(world_h / 2)
-        for x in range(cx - int(Recovery.LIDAR_RADIUS / Recovery.RESO), cx + int(Recovery.LIDAR_RADIUS / Recovery.RESO) + 1):
-            for y in range(cy - int(Recovery.LIDAR_RADIUS / Recovery.RESO), cy + int(Recovery.LIDAR_RADIUS / Recovery.RESO) + 1):
-                if (x-cx)**2 + (y-cy)**2 <= (Recovery.LIDAR_RADIUS / Recovery.RESO)**2:
+        for x in range(cx - int(Recovery.LIDAR_RADIUS / Recovery.RESO),
+                       cx + int(Recovery.LIDAR_RADIUS / Recovery.RESO) + 1):
+            for y in range(cy - int(Recovery.LIDAR_RADIUS / Recovery.RESO),
+                           cy + int(Recovery.LIDAR_RADIUS / Recovery.RESO) + 1):
+                if (x - cx) ** 2 + (y - cy) ** 2 <= (Recovery.LIDAR_RADIUS / Recovery.RESO) ** 2:
                     world_arr[x + y * world_w] = 0
 
         for blob_id in blobs:
             arr = blobs[blob_id].arr
-            for pos_x,pos_y in arr:
+            for pos_x, pos_y in arr:
                 x = round((pos_x - (self.robot_pos.x - Recovery.LIDAR_RADIUS)) / Recovery.RESO)
                 y = round((pos_y - (self.robot_pos.y - Recovery.LIDAR_RADIUS)) / Recovery.RESO)
-                #print("obs at", x, y)
+                # print("obs at", x, y)
                 world_arr[x + y * world_w] = 1
-
 
         # info about grid map's pose relative to 'map' frame
         origin = Pose()
@@ -89,8 +90,8 @@ class Recovery:
         # assume in map frame
         self.end = [self.last_known_pos.x, self.last_known_pos.y]
         self.start = [self.robot_pos.x, self.robot_pos.y]
-        print("finding path from ", (utils.show(self.start[0]),utils.show(self.start[1])), "to ",
-                  (utils.show(self.end[0]),utils.show(self.end[1])))
+        print("finding path from ", (utils.show(self.start[0]), utils.show(self.start[1])), "to ",
+              (utils.show(self.end[0]), utils.show(self.end[1])))
 
         print(self.world.T)
 
@@ -123,11 +124,11 @@ class Recovery:
             print("inside obstacle")
             return []
 
-        #self.world.data[start_cell_x + start_cell_y * self.world.width] = 5
-        #self.world.data[end_cell_x + end_cell_y * self.world.width] = 7
+        # self.world.data[start_cell_x + start_cell_y * self.world.width] = 5
+        # self.world.data[end_cell_x + end_cell_y * self.world.width] = 7
 
-        #print("MAP IS")
-        #for h in range(self.world.height):
+        # print("MAP IS")
+        # for h in range(self.world.height):
         #    s = "["
         #    for w in range(self.world.width):
         #        s += str(self.world.data[w + h * self.world.width]) + ","
@@ -143,8 +144,10 @@ class Recovery:
         @param x: x index
         @param y: y index
         """
-        for ny in range(max(0, y - Recovery.SEARCH_RANGE * 2), min(self.world.height, y + Recovery.SEARCH_RANGE * 2 + 1)):
-            for nx in range(max(0, x - Recovery.SEARCH_RANGE * 2), min(self.world.width, x + Recovery.SEARCH_RANGE * 2 + 1)):
+        for ny in range(max(0, y - Recovery.SEARCH_RANGE * 2),
+                        min(self.world.height, y + Recovery.SEARCH_RANGE * 2 + 1)):
+            for nx in range(max(0, x - Recovery.SEARCH_RANGE * 2),
+                            min(self.world.width, x + Recovery.SEARCH_RANGE * 2 + 1)):
                 if ny != y or nx != x:
                     if not self.is_near_obs(nx, ny):
                         return nx, ny
@@ -171,16 +174,16 @@ class Recovery:
         goal = Cell(self.end)
 
         # stores (Cell objs, heuristic)
-        open_set = [] # min heap weighted by heuristic/diagonal to goal
+        open_set = []  # min heap weighted by heuristic/diagonal to goal
         hq.heappush(open_set, (self.diagonal(start.coords[0], start.coords[1]), start))
 
-        closed_set = {} # dict maps curr_node:parent_node for back tracing later
+        closed_set = {}  # dict maps curr_node:parent_node for back tracing later
 
-        closed_set_angles = {} # maps curr_node:optimal angle to get here from prev node
- 
+        closed_set_angles = {}  # maps curr_node:optimal angle to get here from prev node
+
         closed_set_angles[start] = self.robot_ang
 
-        g_vals = {} # dict maps node to actual cost to get from start to node
+        g_vals = {}  # dict maps node to actual cost to get from start to node
         g_vals[start] = 0
 
         while len(open_set) > 0:
@@ -195,7 +198,7 @@ class Recovery:
                     path.append(curr)
                     curr = closed_set[curr]
                 print("found 1")
-                return path # [goal, ..., c, b, a] reversed so we can pop() later
+                return path  # [goal, ..., c, b, a] reversed so we can pop() later
 
             # look at all neighbors in y dir
             cx = curr.coords[0]
@@ -209,7 +212,7 @@ class Recovery:
                         temp_g = g_vals[curr] + Recovery.EDGE_WEIGHT + abs(temp_yaw)
                         # if cost from start to n is lowest so far, or no cost calculated yet
                         if (n in g_vals and temp_g < g_vals[n]) or (n not in g_vals):
-                            closed_set[n] = curr # update shortest path to n
+                            closed_set[n] = curr  # update shortest path to n
                             closed_set_angles[n] = temp_yaw
                             g_vals[n] = temp_g
                             temp_f = g_vals[n] + self.diagonal(nx, ny)
@@ -262,7 +265,6 @@ class Recovery:
                 return -np.pi * 0.25 - yaw1
         print("ERROR IN GET YAW ROTATE")
 
-
     def is_near_obs(self, x, y):
         """
         Check if cell index at x,y is near a rock, to take into account of robot size in map
@@ -273,7 +275,7 @@ class Recovery:
         for ny in range(max(0, y - Recovery.SEARCH_RANGE), min(self.world.height, y + Recovery.SEARCH_RANGE + 1)):
             for nx in range(max(0, x - Recovery.SEARCH_RANGE), min(self.world.width, x + Recovery.SEARCH_RANGE + 1)):
                 if nx != x or ny != y:
-                    if self.world.get_cell(nx, ny): # has obstacle
+                    if self.world.get_cell(nx, ny):  # has obstacle
                         return True
         return False
 
@@ -324,14 +326,17 @@ class World:
         self.width = width
         self.height = height
         self.reso = round(reso, 3)
-        self.frame = frame # map frame
+        self.frame = frame  # map frame
 
-        self.origin = [] # [x,y,yaw] representation of maze pose in map frame
+        self.origin = []  # [x,y,yaw] representation of maze pose in map frame
         self.origin.append(origin.position.x)
         self.origin.append(origin.position.y)
-        rpy = tf.transformations.euler_from_quaternion((origin.orientation.x, origin.orientation.y, origin.orientation.z, origin.orientation.w))
-        self.origin.append(rpy[2]) # yaw is 3rd element
-        self.T = np.array([[np.cos(self.origin[2]), -np.sin(self.origin[2]), 0, self.origin[0]], [np.sin(self.origin[2]), np.cos(self.origin[2]), 0, self.origin[1]], [0, 0, 1, 0], [0, 0, 0, 1]]) # transformation matrix from occ_grid to map frame
+        rpy = tf.transformations.euler_from_quaternion(
+            (origin.orientation.x, origin.orientation.y, origin.orientation.z, origin.orientation.w))
+        self.origin.append(rpy[2])  # yaw is 3rd element
+        self.T = np.array([[np.cos(self.origin[2]), -np.sin(self.origin[2]), 0, self.origin[0]],
+                           [np.sin(self.origin[2]), np.cos(self.origin[2]), 0, self.origin[1]], [0, 0, 1, 0],
+                           [0, 0, 0, 1]])  # transformation matrix from occ_grid to map frame
         print(self.T)
 
     def get_cell(self, x, y):
@@ -372,7 +377,7 @@ class World:
         """
         return (int(math.floor(x / self.reso)), int(math.floor(y / self.reso)))
 
-    def cell_to_grid(self, x , y):
+    def cell_to_grid(self, x, y):
         """
         Transform x,y cell indexes to grid coordinates, rounded to be center of cell
         @param x: cell index in horz direction
@@ -388,13 +393,14 @@ class World:
         """
         return 0 <= x < self.width and 0 <= y < self.height
 
+
 class Cell:
     def __init__(self, coords):
         """
         Stores only [x,y] coords/indexes in grid
         @param coords: list of form [x,y] indicating cell index
         """
-        self.coords = coords # expect [x,y] list
+        self.coords = coords  # expect [x,y] list
 
     def __hash__(self):
         """
