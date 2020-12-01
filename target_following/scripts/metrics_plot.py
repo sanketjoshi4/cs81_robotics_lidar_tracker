@@ -13,7 +13,7 @@ def generate_graph(cmd_vel_freq=1):
     """
 
     try:
-        i = 1
+        run = 1
         for file_name in sys.argv[1:]:
             try:
                 # Read csv
@@ -24,8 +24,8 @@ def generate_graph(cmd_vel_freq=1):
                     # Prepare matplotlib graph
                     x = [d[0] for i, d in enumerate(output) if i % cmd_vel_freq == 0]
                     y = [d[1] for i, d in enumerate(output) if i % cmd_vel_freq == 0]
-                    plt.plot(x, y, label="Run {}".format(i))
-                    i += 1
+                    plt.plot(x, y, label="Run {}".format(run))
+                    run += 1
 
             except:
                 print "File not found ({})".format(file_name)
