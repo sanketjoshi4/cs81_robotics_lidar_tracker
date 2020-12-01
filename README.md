@@ -31,3 +31,5 @@ After this command, you will be prompted for integer input of 1, 2, or 3. Type t
 Every simulation exports a metrics csv file in /scripts/metrics. Inorder to generate a multiline graph, enter the following command
 
 `python metrics_plot.py <path_to_metrics_file_1>.csv <path_to_metrics_file_2>.csv ...`
+
+To view auto-generated docs, open the /docs/*.html in any web browser
